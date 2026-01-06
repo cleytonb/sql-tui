@@ -23,9 +23,23 @@ print_banner() {
 
 install_rust() {
     if ! command -v cargo &> /dev/null; then
-        echo -e "${YELLOW}Installing Rust...${NC}"
-        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+        echo -e "${YELLOW}Rust not found. Installing...${NC}"
+
+        # Try curl first, then wget
+        if command -v curl &> /dev/null; then
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+        elif command -v wget &> /dev/null; then
+            wget -qO- https://sh.rustup.rs | sh -s -- -y
+        else
+            echo -e "${RED}❌ Neither curl nor wget found.${NC}"
+            echo "   Please install Rust manually: https://rustup.rs"
+            exit 1
+        fi
+
         source "$HOME/.cargo/env"
+        echo -e "${GREEN}✓ Rust installed${NC}"
+    else
+        echo -e "${GREEN}✓ Rust found${NC}"
     fi
 }
 

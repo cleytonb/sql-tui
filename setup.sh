@@ -11,12 +11,25 @@ echo ""
 
 # Check/Install Rust
 if ! command -v cargo &> /dev/null; then
-    echo "❌ Rust not found."
-    echo "   Install from: https://rustup.rs"
-    echo "   Run: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"
-    exit 1
+    echo "⚙️  Rust not found. Installing..."
+
+    # Try curl first, then wget
+    if command -v curl &> /dev/null; then
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    elif command -v wget &> /dev/null; then
+        wget -qO- https://sh.rustup.rs | sh -s -- -y
+    else
+        echo "❌ Neither curl nor wget found."
+        echo "   Please install Rust manually: https://rustup.rs"
+        exit 1
+    fi
+
+    # Load Rust environment
+    source "$HOME/.cargo/env"
+    echo "✓ Rust installed"
+else
+    echo "✓ Rust found"
 fi
-echo "✓ Rust found"
 
 # Build
 echo "🔨 Building release (1-2 minutes)..."
