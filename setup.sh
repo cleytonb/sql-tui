@@ -57,24 +57,37 @@ EOF
     echo "✓ Config saved to .env"
 fi
 
-# Install atui command
+# Add alias to shell config
 echo ""
-if [ -w /usr/local/bin ]; then
-    cp atui /usr/local/bin/
-    echo "✓ Installed: atui command"
+INSTALL_PATH="$(pwd)/atui"
+
+# Detect shell and config file
+if [ -f "$HOME/.zshrc" ]; then
+    SHELL_RC="$HOME/.zshrc"
+elif [ -f "$HOME/.bashrc" ]; then
+    SHELL_RC="$HOME/.bashrc"
 else
-    mkdir -p ~/bin
-    cp atui ~/bin/
-    echo "✓ Installed: ~/bin/atui"
-    echo "   Add to PATH: export PATH=\"\$HOME/bin:\$PATH\""
+    SHELL_RC="$HOME/.zshrc"
+fi
+
+# Add alias if not exists
+if ! grep -q "alias atui=" "$SHELL_RC" 2>/dev/null; then
+    echo "" >> "$SHELL_RC"
+    echo "# Alrajhi SQL TUI" >> "$SHELL_RC"
+    echo "alias atui='$INSTALL_PATH'" >> "$SHELL_RC"
+    echo "✓ Added alias to $SHELL_RC"
+    echo "  Run: source $SHELL_RC"
+else
+    echo "✓ Alias already exists in $SHELL_RC"
 fi
 
 echo ""
 echo "════════════════════════════════════"
 echo "✅ DONE! Run with:"
 echo ""
-echo "   atui          (if in PATH)"
-echo "   ./run.sh      (from this folder)"
+echo "   source $SHELL_RC   (reload shell)"
+echo "   atui               (run app)"
+echo "   atui test          (test connection)"
 echo "════════════════════════════════════"
 
 # Create simple run script
