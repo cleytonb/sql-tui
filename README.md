@@ -16,30 +16,50 @@ High-performance SQL Server Terminal UI built with Rust for Alrajhi Bank.
 
 ## Quick Install
 
-### Prerequisites
-- Rust toolchain (1.70+): https://rustup.rs/
-
-### Install & Run
+### One-Liner (Recommended)
 
 ```bash
-# Clone the repository
-git clone https://github.com/YOUR_USERNAME/alrajhi-sql-tui.git
-cd alrajhi-sql-tui
-
-# Build release version
-cargo build --release
-
-# Run the application
-./target/release/alrajhi_sql_tui
+git clone https://github.com/hszkf/alrajhi-sql-tui.git && cd alrajhi-sql-tui && ./setup.sh
 ```
 
-### Update to Latest Version
+This will:
+1. Clone the repository
+2. Build the release binary
+3. Prompt for database credentials
+4. Install `atui` command
+
+### After Installation
 
 ```bash
+atui              # Run from anywhere
+atui update       # Update to latest version
+atui config       # Change database credentials
+```
+
+### Manual Install
+
+```bash
+# 1. Clone
+git clone https://github.com/hszkf/alrajhi-sql-tui.git
 cd alrajhi-sql-tui
-git pull
+
+# 2. Build
 cargo build --release
-./target/release/alrajhi_sql_tui
+
+# 3. Configure (create .env file)
+cp .env.example .env
+nano .env  # Edit with your credentials
+
+# 4. Run
+source .env && ./target/release/alrajhi_sql_tui
+```
+
+### Update
+
+```bash
+atui update
+# Or manually:
+cd ~/alrajhi-sql-tui && git pull && cargo build --release
 ```
 
 ## Keyboard Shortcuts
@@ -94,28 +114,7 @@ cargo build --release
 
 ## Configuration
 
-Set environment variables before running:
-
-```bash
-# Option 1: Export in terminal
-export DB_HOST="10.200.224.42"
-export DB_PORT="1433"
-export DB_USER="your_username"
-export DB_PASSWORD="your_password"
-export DB_DATABASE="Staging"
-
-# Option 2: Create .env file (not tracked by git)
-cat > .env << EOF
-DB_HOST=10.200.224.42
-DB_PORT=1433
-DB_USER=your_username
-DB_PASSWORD=your_password
-DB_DATABASE=Staging
-EOF
-
-# Load .env and run
-source .env && ./target/release/alrajhi_sql_tui
-```
+Environment variables (set in `.env` file):
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -124,6 +123,15 @@ source .env && ./target/release/alrajhi_sql_tui
 | `DB_USER` | sa | Database username |
 | `DB_PASSWORD` | (empty) | Database password |
 | `DB_DATABASE` | master | Default database |
+
+Example `.env` file:
+```bash
+DB_HOST=10.200.224.42
+DB_PORT=1433
+DB_USER=your_username
+DB_PASSWORD=your_password
+DB_DATABASE=Staging
+```
 
 ## Project Structure
 
@@ -170,7 +178,7 @@ cargo build --release
 ### Connection Issues
 - Verify SQL Server is accessible on port 1433
 - Check firewall settings
-- Verify credentials in connection.rs
+- Run `atui config` to update credentials
 
 ---
 Built with Rust for Alrajhi Bank IT Team
