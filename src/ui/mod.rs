@@ -51,7 +51,7 @@ fn draw_loading_popup(f: &mut Frame, app: &App, area: Rect) {
             Span::styled(
                 format!("  {}  Executing query...  ", spinner),
                 Style::default()
-                    .fg(AlrajhiTheme::GOLD)
+                    .fg(DefaultTheme::GOLD)
                     .add_modifier(Modifier::BOLD),
             ),
         ]),
@@ -62,8 +62,8 @@ fn draw_loading_popup(f: &mut Frame, app: &App, area: Rect) {
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .border_style(Style::default().fg(AlrajhiTheme::PRIMARY))
-                .style(Style::default().bg(AlrajhiTheme::BG_PANEL)),
+                .border_style(Style::default().fg(DefaultTheme::PRIMARY))
+                .style(Style::default().bg(DefaultTheme::BG_PANEL)),
         )
         .alignment(Alignment::Center);
 

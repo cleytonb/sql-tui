@@ -69,6 +69,7 @@ impl DbConnection {
             config.encryption(tiberius::EncryptionLevel::NotSupported);
         }
 
+        println!("{}", config.get_addr());
         let tcp = TcpStream::connect(config.get_addr())
             .await
             .context("Failed to connect to SQL Server")?;

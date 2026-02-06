@@ -2,7 +2,7 @@
 
 use crate::app::{App, SchemaNodeType, ResultsTab};
 use crate::db::CellValue;
-use crate::ui::AlrajhiTheme;
+use crate::ui::DefaultTheme;
 use ratatui::prelude::*;
 use ratatui::widgets::{Block, Borders, List, ListItem, Paragraph, Row, Table, Scrollbar, ScrollbarOrientation, ScrollbarState, Cell};
 use ratatui::layout::Margin;
@@ -13,9 +13,9 @@ const LINE_NUMBER_WIDTH: u16 = 5;
 /// Draw the query editor panel with line numbers and scrolling
 pub fn draw_query_editor(f: &mut Frame, app: &mut App, area: Rect, active: bool) {
     let border_style = if active {
-        AlrajhiTheme::active_border()
+        DefaultTheme::active_border()
     } else {
-        AlrajhiTheme::inactive_border()
+        DefaultTheme::inactive_border()
     };
 
     let title = if active { " Query [1] ▪ " } else { " Query [1] " };
@@ -24,7 +24,7 @@ pub fn draw_query_editor(f: &mut Frame, app: &mut App, area: Rect, active: bool)
     let block = Block::default()
         .borders(Borders::ALL)
         .border_style(border_style)
-        .title(Span::styled(title, AlrajhiTheme::title()));
+        .title(Span::styled(title, DefaultTheme::title()));
 
     let inner_area = block.inner(area);
     f.render_widget(block, area);
@@ -66,7 +66,7 @@ pub fn draw_query_editor(f: &mut Frame, app: &mut App, area: Rect, active: bool)
             .map(|(n, _)| {
                 Line::from(Span::styled(
                     format!("{:>3} │", n + 1),
-                    Style::default().fg(AlrajhiTheme::COMMENT),
+                    Style::default().fg(DefaultTheme::COMMENT),
                 ))
             })
             .collect();
@@ -99,9 +99,9 @@ pub fn draw_query_editor(f: &mut Frame, app: &mut App, area: Rect, active: bool)
 /// Draw the results table panel with tabs
 pub fn draw_results_table(f: &mut Frame, app: &App, area: Rect, active: bool) {
     let border_style = if active {
-        AlrajhiTheme::active_border()
+        DefaultTheme::active_border()
     } else {
-        AlrajhiTheme::inactive_border()
+        DefaultTheme::inactive_border()
     };
 
     // Draw tabs header
@@ -125,12 +125,12 @@ pub fn draw_results_table(f: &mut Frame, app: &App, area: Rect, active: bool) {
     if app.result.columns.is_empty() {
         let help_text = vec![
             Line::from(""),
-            Line::from(Span::styled("No results yet", AlrajhiTheme::dim_text())),
+            Line::from(Span::styled("No results yet", DefaultTheme::dim_text())),
             Line::from(""),
             Line::from(vec![
-                Span::styled("Type a query and press ", AlrajhiTheme::dim_text()),
-                Span::styled("Enter", AlrajhiTheme::info()),
-                Span::styled(" to execute", AlrajhiTheme::dim_text()),
+                Span::styled("Type a query and press ", DefaultTheme::dim_text()),
+                Span::styled("Enter", DefaultTheme::info()),
+                Span::styled(" to execute", DefaultTheme::dim_text()),
             ]),
         ];
         let empty_msg = Paragraph::new(help_text)
@@ -164,13 +164,13 @@ fn draw_results_tabs(f: &mut Frame, app: &App, area: Rect, active: bool) {
     for (label, tab) in tabs {
         let style = if app.results_tab == tab {
             Style::default()
-                .fg(AlrajhiTheme::TEXT)
-                .bg(AlrajhiTheme::PRIMARY)
+                .fg(DefaultTheme::TEXT)
+                .bg(DefaultTheme::PRIMARY)
                 .add_modifier(Modifier::BOLD)
         } else if active {
-            Style::default().fg(AlrajhiTheme::TEXT_DIM)
+            Style::default().fg(DefaultTheme::TEXT_DIM)
         } else {
-            Style::default().fg(AlrajhiTheme::TEXT_MUTED)
+            Style::default().fg(DefaultTheme::TEXT_MUTED)
         };
         spans.push(Span::styled(format!(" {} ", label), style));
         spans.push(Span::raw(" "));
@@ -183,21 +183,21 @@ fn draw_results_tabs(f: &mut Frame, app: &App, area: Rect, active: bool) {
             app.result.row_count,
             app.result.columns.len()
         );
-        spans.push(Span::styled(info, AlrajhiTheme::dim_text()));
+        spans.push(Span::styled(info, DefaultTheme::dim_text()));
     }
 
     let tabs_line = Line::from(spans);
     let tabs_widget = Paragraph::new(tabs_line)
-        .style(Style::default().bg(AlrajhiTheme::BG_PANEL));
+        .style(Style::default().bg(DefaultTheme::BG_PANEL));
     f.render_widget(tabs_widget, area);
 }
 
 /// Draw the data tab (table rows)
 fn draw_results_data(f: &mut Frame, app: &App, area: Rect, active: bool) {
     let border_style = if active {
-        AlrajhiTheme::active_border()
+        DefaultTheme::active_border()
     } else {
-        AlrajhiTheme::inactive_border()
+        DefaultTheme::inactive_border()
     };
 
     // Build title with stats
@@ -237,7 +237,7 @@ fn draw_results_data(f: &mut Frame, app: &App, area: Rect, active: bool) {
 
     // Create header row with row number column and type indicators
     let mut header_cells: Vec<Cell> = vec![
-        Cell::from(" # ").style(AlrajhiTheme::table_header())
+        Cell::from(" # ").style(DefaultTheme::table_header())
     ];
     header_cells.extend(
         app.result
@@ -254,9 +254,9 @@ fn draw_results_data(f: &mut Frame, app: &App, area: Rect, active: bool) {
                 let header_text = format!("{} {}", type_indicator, name);
 
                 let style = if active && i == app.results_col_selected {
-                    AlrajhiTheme::selected()
+                    DefaultTheme::selected()
                 } else {
-                    AlrajhiTheme::table_header()
+                    DefaultTheme::table_header()
                 };
                 Cell::from(header_text).style(style)
             })
@@ -281,9 +281,9 @@ fn draw_results_data(f: &mut Frame, app: &App, area: Rect, active: bool) {
         .map(|(row_idx, row)| {
             // Row number cell
             let row_num_style = if active && row_idx == app.results_selected {
-                AlrajhiTheme::selected()
+                DefaultTheme::selected()
             } else {
-                AlrajhiTheme::row_number()
+                DefaultTheme::row_number()
             };
             let mut cells: Vec<Cell> = vec![
                 Cell::from(format!("{:>width$} ", row_idx + 1, width = row_num_width as usize - 1))
@@ -302,15 +302,15 @@ fn draw_results_data(f: &mut Frame, app: &App, area: Rect, active: bool) {
                         let display_value: String = value.chars().take(col_width as usize - 2).collect();
 
                         let style = if active && row_idx == app.results_selected && col_idx == app.results_col_selected {
-                            AlrajhiTheme::selected()
+                            DefaultTheme::selected()
                         } else if active && row_idx == app.results_selected {
-                            AlrajhiTheme::highlighted()
+                            DefaultTheme::highlighted()
                         } else if is_null {
-                            AlrajhiTheme::null_value()
+                            DefaultTheme::null_value()
                         } else if row_idx % 2 == 1 {
-                            AlrajhiTheme::table_row_alt()
+                            DefaultTheme::table_row_alt()
                         } else {
-                            AlrajhiTheme::normal_text()
+                            DefaultTheme::normal_text()
                         };
 
                         Cell::from(format!(" {} ", display_value)).style(style)
@@ -326,9 +326,9 @@ fn draw_results_data(f: &mut Frame, app: &App, area: Rect, active: bool) {
             Block::default()
                 .borders(Borders::ALL)
                 .border_style(border_style)
-                .title(Span::styled(title, AlrajhiTheme::title())),
+                .title(Span::styled(title, DefaultTheme::title())),
         )
-        .highlight_style(AlrajhiTheme::highlighted());
+        .highlight_style(DefaultTheme::highlighted());
 
     f.render_widget(table, area);
 
@@ -363,7 +363,7 @@ fn draw_results_data(f: &mut Frame, app: &App, area: Rect, active: bool) {
         let pos_y = area.y + area.height.saturating_sub(1);
 
         if pos_x > area.x && pos_y < area.y + area.height {
-            let pos_span = Span::styled(pos_text, AlrajhiTheme::dim_text());
+            let pos_span = Span::styled(pos_text, DefaultTheme::dim_text());
             f.render_widget(
                 Paragraph::new(pos_span),
                 Rect::new(pos_x, pos_y, pos_len, 1),
@@ -375,9 +375,9 @@ fn draw_results_data(f: &mut Frame, app: &App, area: Rect, active: bool) {
 /// Draw the columns tab (column info)
 fn draw_results_columns(f: &mut Frame, app: &App, area: Rect, active: bool) {
     let border_style = if active {
-        AlrajhiTheme::active_border()
+        DefaultTheme::active_border()
     } else {
-        AlrajhiTheme::inactive_border()
+        DefaultTheme::inactive_border()
     };
 
     let title = format!(" Columns │ {} total ", app.result.columns.len());
@@ -400,18 +400,18 @@ fn draw_results_columns(f: &mut Frame, app: &App, area: Rect, active: bool) {
         .map(|(idx, col)| {
             let type_indicator = get_type_indicator(&col.type_name);
             let row_style = if active && idx == app.results_selected {
-                AlrajhiTheme::selected()
+                DefaultTheme::selected()
             } else if idx % 2 == 1 {
-                AlrajhiTheme::table_row_alt()
+                DefaultTheme::table_row_alt()
             } else {
-                AlrajhiTheme::normal_text()
+                DefaultTheme::normal_text()
             };
 
             Row::new(vec![
-                Cell::from(format!(" {:>3} ", idx + 1)).style(AlrajhiTheme::row_number()),
+                Cell::from(format!(" {:>3} ", idx + 1)).style(DefaultTheme::row_number()),
                 Cell::from(format!(" {} ", type_indicator)),
                 Cell::from(format!(" {} ", col.name)).style(row_style),
-                Cell::from(format!(" {} ", col.type_name)).style(AlrajhiTheme::dim_text()),
+                Cell::from(format!(" {} ", col.type_name)).style(DefaultTheme::dim_text()),
             ])
         })
         .collect();
@@ -424,10 +424,10 @@ fn draw_results_columns(f: &mut Frame, app: &App, area: Rect, active: bool) {
     ];
 
     let header = Row::new(vec![
-        Cell::from(" # ").style(AlrajhiTheme::table_header()),
-        Cell::from(" ").style(AlrajhiTheme::table_header()),
-        Cell::from(" Column Name ").style(AlrajhiTheme::table_header()),
-        Cell::from(" Data Type ").style(AlrajhiTheme::table_header()),
+        Cell::from(" # ").style(DefaultTheme::table_header()),
+        Cell::from(" ").style(DefaultTheme::table_header()),
+        Cell::from(" Column Name ").style(DefaultTheme::table_header()),
+        Cell::from(" Data Type ").style(DefaultTheme::table_header()),
     ])
     .height(1);
 
@@ -437,7 +437,7 @@ fn draw_results_columns(f: &mut Frame, app: &App, area: Rect, active: bool) {
             Block::default()
                 .borders(Borders::ALL)
                 .border_style(border_style)
-                .title(Span::styled(title, AlrajhiTheme::title())),
+                .title(Span::styled(title, DefaultTheme::title())),
         );
 
     f.render_widget(table, area);
@@ -463,9 +463,9 @@ fn draw_results_columns(f: &mut Frame, app: &App, area: Rect, active: bool) {
 /// Draw the stats tab (query statistics)
 fn draw_results_stats(f: &mut Frame, app: &App, area: Rect, active: bool) {
     let border_style = if active {
-        AlrajhiTheme::active_border()
+        DefaultTheme::active_border()
     } else {
-        AlrajhiTheme::inactive_border()
+        DefaultTheme::inactive_border()
     };
 
     let exec_time = app.result.execution_time;
@@ -498,30 +498,30 @@ fn draw_results_stats(f: &mut Frame, app: &App, area: Rect, active: bool) {
     // Build stats text
     let mut stats_lines: Vec<Line> = vec![
         Line::from(""),
-        Line::from(Span::styled("═══ QUERY STATISTICS ═══", AlrajhiTheme::info())),
+        Line::from(Span::styled("═══ QUERY STATISTICS ═══", DefaultTheme::info())),
         Line::from(""),
         Line::from(vec![
-            Span::styled("  Execution Time:  ", AlrajhiTheme::dim_text()),
-            Span::styled(format!("{:.2} ms", exec_ms), AlrajhiTheme::success()),
+            Span::styled("  Execution Time:  ", DefaultTheme::dim_text()),
+            Span::styled(format!("{:.2} ms", exec_ms), DefaultTheme::success()),
         ]),
         Line::from(vec![
-            Span::styled("  Rows Returned:   ", AlrajhiTheme::dim_text()),
-            Span::styled(format_number(app.result.row_count as i64), AlrajhiTheme::info()),
+            Span::styled("  Rows Returned:   ", DefaultTheme::dim_text()),
+            Span::styled(format_number(app.result.row_count as i64), DefaultTheme::info()),
         ]),
         Line::from(vec![
-            Span::styled("  Columns:         ", AlrajhiTheme::dim_text()),
-            Span::styled(format!("{}", app.result.columns.len()), AlrajhiTheme::info()),
+            Span::styled("  Columns:         ", DefaultTheme::dim_text()),
+            Span::styled(format!("{}", app.result.columns.len()), DefaultTheme::info()),
         ]),
         Line::from(vec![
-            Span::styled("  Total Cells:     ", AlrajhiTheme::dim_text()),
-            Span::styled(format_number(total_cells as i64), AlrajhiTheme::normal_text()),
+            Span::styled("  Total Cells:     ", DefaultTheme::dim_text()),
+            Span::styled(format_number(total_cells as i64), DefaultTheme::normal_text()),
         ]),
         Line::from(vec![
-            Span::styled("  NULL Values:     ", AlrajhiTheme::dim_text()),
-            Span::styled(format!("{} ({:.1}%)", format_number(null_count as i64), null_percentage), AlrajhiTheme::warning()),
+            Span::styled("  NULL Values:     ", DefaultTheme::dim_text()),
+            Span::styled(format!("{} ({:.1}%)", format_number(null_count as i64), null_percentage), DefaultTheme::warning()),
         ]),
         Line::from(""),
-        Line::from(Span::styled("═══ DATA TYPES ═══", AlrajhiTheme::info())),
+        Line::from(Span::styled("═══ DATA TYPES ═══", DefaultTheme::info())),
         Line::from(""),
     ];
 
@@ -532,30 +532,30 @@ fn draw_results_stats(f: &mut Frame, app: &App, area: Rect, active: bool) {
     for (type_name, count) in type_vec.iter().take(10) {
         let indicator = get_type_indicator(type_name);
         stats_lines.push(Line::from(vec![
-            Span::styled(format!("  {} ", indicator), AlrajhiTheme::normal_text()),
-            Span::styled(format!("{:<20}", type_name), AlrajhiTheme::dim_text()),
-            Span::styled(format!("{:>5} column(s)", count), AlrajhiTheme::normal_text()),
+            Span::styled(format!("  {} ", indicator), DefaultTheme::normal_text()),
+            Span::styled(format!("{:<20}", type_name), DefaultTheme::dim_text()),
+            Span::styled(format!("{:>5} column(s)", count), DefaultTheme::normal_text()),
         ]));
     }
 
     stats_lines.push(Line::from(""));
-    stats_lines.push(Line::from(Span::styled("═══ SHORTCUTS ═══", AlrajhiTheme::info())));
+    stats_lines.push(Line::from(Span::styled("═══ SHORTCUTS ═══", DefaultTheme::info())));
     stats_lines.push(Line::from(""));
     stats_lines.push(Line::from(vec![
-        Span::styled("  Ctrl+E  ", AlrajhiTheme::info()),
-        Span::styled("Export to CSV", AlrajhiTheme::dim_text()),
+        Span::styled("  Ctrl+E  ", DefaultTheme::info()),
+        Span::styled("Export to CSV", DefaultTheme::dim_text()),
     ]));
     stats_lines.push(Line::from(vec![
-        Span::styled("  Ctrl+S  ", AlrajhiTheme::info()),
-        Span::styled("Export to JSON", AlrajhiTheme::dim_text()),
+        Span::styled("  Ctrl+S  ", DefaultTheme::info()),
+        Span::styled("Export to JSON", DefaultTheme::dim_text()),
     ]));
     stats_lines.push(Line::from(vec![
-        Span::styled("  Ctrl+I  ", AlrajhiTheme::info()),
-        Span::styled("Copy row as INSERT", AlrajhiTheme::dim_text()),
+        Span::styled("  Ctrl+I  ", DefaultTheme::info()),
+        Span::styled("Copy row as INSERT", DefaultTheme::dim_text()),
     ]));
     stats_lines.push(Line::from(vec![
-        Span::styled("  Ctrl+Y  ", AlrajhiTheme::info()),
-        Span::styled("Copy cell value", AlrajhiTheme::dim_text()),
+        Span::styled("  Ctrl+Y  ", DefaultTheme::info()),
+        Span::styled("Copy cell value", DefaultTheme::dim_text()),
     ]));
 
     let stats_widget = Paragraph::new(stats_lines)
@@ -563,7 +563,7 @@ fn draw_results_stats(f: &mut Frame, app: &App, area: Rect, active: bool) {
             Block::default()
                 .borders(Borders::ALL)
                 .border_style(border_style)
-                .title(Span::styled(" Stats ", AlrajhiTheme::title())),
+                .title(Span::styled(" Stats ", DefaultTheme::title())),
         );
 
     f.render_widget(stats_widget, area);
@@ -628,9 +628,9 @@ fn hex_encode(data: &[u8]) -> String {
 /// Draw the schema explorer panel
 pub fn draw_schema_explorer(f: &mut Frame, app: &App, area: Rect, active: bool) {
     let border_style = if active {
-        AlrajhiTheme::active_border()
+        DefaultTheme::active_border()
     } else {
-        AlrajhiTheme::inactive_border()
+        DefaultTheme::inactive_border()
     };
 
     let title = if active { " Schema [3] ▪ " } else { " Schema [3] " };
@@ -650,15 +650,15 @@ pub fn draw_schema_explorer(f: &mut Frame, app: &App, area: Rect, active: bool) 
             };
 
             let style = if active && idx == app.schema_selected {
-                AlrajhiTheme::selected()
+                DefaultTheme::selected()
             } else {
                 match node.node_type {
-                    SchemaNodeType::Folder => AlrajhiTheme::info(),
-                    SchemaNodeType::Table => AlrajhiTheme::normal_text(),
-                    SchemaNodeType::View => AlrajhiTheme::dim_text(),
-                    SchemaNodeType::Procedure => AlrajhiTheme::warning(),
-                    SchemaNodeType::Function => AlrajhiTheme::warning(),
-                    _ => AlrajhiTheme::normal_text(),
+                    SchemaNodeType::Folder => DefaultTheme::info(),
+                    SchemaNodeType::Table => DefaultTheme::normal_text(),
+                    SchemaNodeType::View => DefaultTheme::dim_text(),
+                    SchemaNodeType::Procedure => DefaultTheme::warning(),
+                    SchemaNodeType::Function => DefaultTheme::warning(),
+                    _ => DefaultTheme::normal_text(),
                 }
             };
 
@@ -672,9 +672,9 @@ pub fn draw_schema_explorer(f: &mut Frame, app: &App, area: Rect, active: bool) 
             Block::default()
                 .borders(Borders::ALL)
                 .border_style(border_style)
-                .title(Span::styled(title, AlrajhiTheme::title())),
+                .title(Span::styled(title, DefaultTheme::title())),
         )
-        .highlight_style(AlrajhiTheme::selected());
+        .highlight_style(DefaultTheme::selected());
 
     f.render_widget(list, area);
 }
@@ -682,9 +682,9 @@ pub fn draw_schema_explorer(f: &mut Frame, app: &App, area: Rect, active: bool) 
 /// Draw the history panel
 pub fn draw_history_panel(f: &mut Frame, app: &App, area: Rect, active: bool) {
     let border_style = if active {
-        AlrajhiTheme::active_border()
+        DefaultTheme::active_border()
     } else {
-        AlrajhiTheme::inactive_border()
+        DefaultTheme::inactive_border()
     };
 
     let title = if active { " History [4] ▪ " } else { " History [4] " };
@@ -711,9 +711,9 @@ pub fn draw_history_panel(f: &mut Frame, app: &App, area: Rect, active: bool) {
             let row_info = entry.row_count.map(|r| format!(" ({} rows)", r)).unwrap_or_default();
 
             let style = if active && idx == app.history_selected {
-                AlrajhiTheme::selected()
+                DefaultTheme::selected()
             } else {
-                AlrajhiTheme::normal_text()
+                DefaultTheme::normal_text()
             };
 
             ListItem::new(format!("{} │ {}{}", time, query_preview, row_info)).style(style)
@@ -727,7 +727,7 @@ pub fn draw_history_panel(f: &mut Frame, app: &App, area: Rect, active: bool) {
                 .border_style(border_style)
                 .title(Span::styled(
                     format!("{} ({}) ", title, app.history.len()),
-                    AlrajhiTheme::title(),
+                    DefaultTheme::title(),
                 )),
         );
 
@@ -770,7 +770,7 @@ fn highlight_sql(sql: &str) -> Vec<Line<'static>> {
                 }
                 // Rest of line is comment
                 let comment: String = chars[i..].iter().collect();
-                spans.push(Span::styled(comment, Style::default().fg(AlrajhiTheme::COMMENT)));
+                spans.push(Span::styled(comment, Style::default().fg(DefaultTheme::COMMENT)));
                 break;
             }
 
@@ -780,7 +780,7 @@ fn highlight_sql(sql: &str) -> Vec<Line<'static>> {
                     current_word.push(c);
                     spans.push(Span::styled(
                         current_word.clone(),
-                        Style::default().fg(AlrajhiTheme::STRING),
+                        Style::default().fg(DefaultTheme::STRING),
                     ));
                     current_word.clear();
                     in_string = false;
@@ -804,7 +804,7 @@ fn highlight_sql(sql: &str) -> Vec<Line<'static>> {
                 }
                 spans.push(Span::styled(
                     c.to_string(),
-                    Style::default().fg(AlrajhiTheme::OPERATOR),
+                    Style::default().fg(DefaultTheme::OPERATOR),
                 ));
             } else {
                 current_word.push(c);
@@ -830,21 +830,21 @@ fn colorize_word(word: &str, keywords: &[&str]) -> Span<'static> {
         Span::styled(
             word.to_string(),
             Style::default()
-                .fg(AlrajhiTheme::KEYWORD)
+                .fg(DefaultTheme::KEYWORD)
                 .add_modifier(Modifier::BOLD),
         )
     } else if word.chars().all(|c| c.is_ascii_digit() || c == '.') {
         Span::styled(
             word.to_string(),
-            Style::default().fg(AlrajhiTheme::NUMBER),
+            Style::default().fg(DefaultTheme::NUMBER),
         )
     } else if word.starts_with('@') || word.starts_with("@@") {
         Span::styled(
             word.to_string(),
-            Style::default().fg(AlrajhiTheme::FUNCTION),
+            Style::default().fg(DefaultTheme::FUNCTION),
         )
     } else {
-        Span::styled(word.to_string(), AlrajhiTheme::normal_text())
+        Span::styled(word.to_string(), DefaultTheme::normal_text())
     }
 }
 
@@ -910,7 +910,7 @@ fn highlight_sql_with_scroll(
                     current_word.clear();
                 }
                 let comment: String = chars[i..].iter().collect();
-                spans.push(Span::styled(comment, Style::default().fg(AlrajhiTheme::COMMENT)));
+                spans.push(Span::styled(comment, Style::default().fg(DefaultTheme::COMMENT)));
                 break;
             }
 
@@ -927,7 +927,7 @@ fn highlight_sql_with_scroll(
                 current_word.push(c);
                 spans.push(Span::styled(
                     current_word.clone(),
-                    Style::default().fg(AlrajhiTheme::STRING),
+                    Style::default().fg(DefaultTheme::STRING),
                 ));
                 current_word.clear();
                 in_string = false;
@@ -940,7 +940,7 @@ fn highlight_sql_with_scroll(
                 }
                 spans.push(Span::styled(
                     c.to_string(),
-                    Style::default().fg(AlrajhiTheme::OPERATOR),
+                    Style::default().fg(DefaultTheme::OPERATOR),
                 ));
             } else {
                 current_word.push(c);
@@ -951,7 +951,7 @@ fn highlight_sql_with_scroll(
 
         if !current_word.is_empty() {
             if in_string {
-                spans.push(Span::styled(current_word, Style::default().fg(AlrajhiTheme::STRING)));
+                spans.push(Span::styled(current_word, Style::default().fg(DefaultTheme::STRING)));
             } else {
                 spans.push(colorize_word(&current_word, &keywords));
             }

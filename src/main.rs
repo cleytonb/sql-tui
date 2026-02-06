@@ -1,8 +1,8 @@
-//! Alrajhi Bank SQL Server Terminal UI
+//! SQL Server Terminal UI
 //! High-performance database client for enterprise use
 
 use anyhow::Result;
-use alrajhi_sql_tui::app::App;
+use sql_tui::app::App;
 use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture},
     execute,

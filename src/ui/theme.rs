@@ -1,18 +1,15 @@
-//! Alrajhi Bank Theme - Corporate branding colors
-
 use ratatui::style::{Color, Modifier, Style};
 
-/// Alrajhi Bank corporate colors
-pub struct AlrajhiTheme;
+pub struct DefaultTheme;
 
-impl AlrajhiTheme {
+impl DefaultTheme {
     // Primary brand colors
-    pub const PRIMARY: Color = Color::Rgb(0, 102, 51);      // Alrajhi Green
-    pub const PRIMARY_LIGHT: Color = Color::Rgb(0, 153, 76); // Light Green
-    pub const PRIMARY_DARK: Color = Color::Rgb(0, 77, 38);   // Dark Green
+    pub const PRIMARY: Color = Color::Rgb(0, 102, 51);      // Default Dark
+    pub const PRIMARY_LIGHT: Color = Color::Rgb(0, 76, 153); // Light Default Blue
+    pub const PRIMARY_DARK: Color = Color::Rgb(0, 0, 102);   // Dark Default Blue
 
     // Secondary colors
-    pub const GOLD: Color = Color::Rgb(197, 164, 103);       // Alrajhi Gold
+    pub const GOLD: Color = Color::Rgb(197, 164, 103);       // Default Gold
     pub const GOLD_LIGHT: Color = Color::Rgb(218, 195, 148);
 
     // UI colors

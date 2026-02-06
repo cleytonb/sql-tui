@@ -1,9 +1,9 @@
 [package]
-name = "alrajhi_sql_tui"
+name = "sql_tui"
 version = "1.0.0"
 edition = "2021"
 authors = ["Alrajhi Bank IT Team"]
-description = "High-performance SQL Server Terminal UI for Alrajhi Bank"
+description = "High-performance SQL Server Terminal UI"
 
 [dependencies]
 # TUI Framework
