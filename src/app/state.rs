@@ -123,6 +123,12 @@ pub struct App {
     /// Selected column in results
     pub results_col_selected: usize,
 
+    /// Horizontal scroll offset for results columns
+    pub results_col_scroll: usize,
+
+    /// Number of columns that fit on screen (updated by UI)
+    pub results_cols_visible: usize,
+
     /// Current results tab
     pub results_tab: ResultsTab,
 
@@ -173,7 +179,7 @@ impl App {
         let short_version = server_version.lines().next().unwrap_or("SQL Server").to_string();
 
         // Default query for quick testing
-        let default_query = "SELECT TOP 2 * FROM Staging.[dbo].RBS_rbsdw98d_trx_ISS_SORT".to_string();
+        let default_query = "SELECT TOP 2 * FROM pmt.Contas".to_string();
         let cursor_pos = default_query.len();
 
         let mut app = Self {
@@ -192,6 +198,8 @@ impl App {
             results_scroll: 0,
             results_selected: 0,
             results_col_selected: 0,
+            results_col_scroll: 0,
+            results_cols_visible: 5, // default, será atualizado pelo UI
             results_tab: ResultsTab::Data,
             history_selected: 0,
             command_buffer: String::new(),
@@ -245,6 +253,7 @@ impl App {
                 self.result = result;
                 self.results_selected = 0;
                 self.results_col_selected = 0;
+                self.results_col_scroll = 0;
             }
             Err(e) => {
                 self.error = Some(e.to_string());

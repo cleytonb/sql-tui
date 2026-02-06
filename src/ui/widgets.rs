@@ -97,7 +97,7 @@ pub fn draw_query_editor(f: &mut Frame, app: &mut App, area: Rect, active: bool)
 }
 
 /// Draw the results table panel with tabs
-pub fn draw_results_table(f: &mut Frame, app: &App, area: Rect, active: bool) {
+pub fn draw_results_table(f: &mut Frame, app: &mut App, area: Rect, active: bool) {
     let border_style = if active {
         DefaultTheme::active_border()
     } else {
@@ -193,7 +193,7 @@ fn draw_results_tabs(f: &mut Frame, app: &App, area: Rect, active: bool) {
 }
 
 /// Draw the data tab (table rows)
-fn draw_results_data(f: &mut Frame, app: &App, area: Rect, active: bool) {
+fn draw_results_data(f: &mut Frame, app: &mut App, area: Rect, active: bool) {
     let border_style = if active {
         DefaultTheme::active_border()
     } else {
@@ -218,12 +218,20 @@ fn draw_results_data(f: &mut Frame, app: &App, area: Rect, active: bool) {
     let col_width: u16 = 20; // Fixed column width
     let cols_that_fit = ((available_width as u16).saturating_sub(row_num_width) / col_width).max(1) as usize;
 
-    // Calculate column scroll offset to keep selected column visible
-    let col_scroll = if app.results_col_selected >= cols_that_fit {
-        app.results_col_selected.saturating_sub(cols_that_fit - 1)
-    } else {
-        0
-    };
+    // Atualiza número de colunas visíveis para uso no handler
+    app.results_cols_visible = cols_that_fit;
+    
+    // Calcula scroll horizontal para manter coluna selecionada visível
+    // Se coluna selecionada está antes da área visível, ajusta scroll para esquerda
+    if app.results_col_selected < app.results_col_scroll {
+        app.results_col_scroll = app.results_col_selected;
+    }
+    // Se coluna selecionada está depois da área visível, ajusta scroll para direita
+    else if app.results_col_selected >= app.results_col_scroll + cols_that_fit {
+        app.results_col_scroll = app.results_col_selected.saturating_sub(cols_that_fit - 1);
+    }
+    
+    let col_scroll = app.results_col_scroll;
 
     // Get visible columns range
     let visible_cols_start = col_scroll;

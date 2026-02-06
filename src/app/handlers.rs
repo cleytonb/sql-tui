@@ -326,7 +326,9 @@ impl App {
                 }
             }
             KeyCode::Left | KeyCode::Char('h') => {
-                self.results_col_selected = self.results_col_selected.saturating_sub(1);
+                if self.results_col_selected > 0 {
+                    self.results_col_selected -= 1;
+                }
             }
             KeyCode::Right | KeyCode::Char('l') => {
                 let max_col = self.result.columns.len().saturating_sub(1);
@@ -349,6 +351,7 @@ impl App {
             KeyCode::Home => {
                 self.results_selected = 0;
                 self.results_col_selected = 0;
+                self.results_col_scroll = 0;
             }
             KeyCode::End => {
                 let max_rows = match self.results_tab {
