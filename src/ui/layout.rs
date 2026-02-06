@@ -41,7 +41,7 @@ fn draw_header(f: &mut Frame, app: &App, area: Rect) {
     // Logo/Title
     let logo = Paragraph::new(vec![
         Line::from(vec![
-            Span::styled("╔═══════════════════════════════════╗", DefaultTheme::title()),
+            Span::styled("╔══════════════════════════╗", DefaultTheme::title()),
         ]),
         Line::from(vec![
             Span::styled("║ ", DefaultTheme::title()),
@@ -50,7 +50,7 @@ fn draw_header(f: &mut Frame, app: &App, area: Rect) {
             Span::styled("║", DefaultTheme::title()),
         ]),
         Line::from(vec![
-            Span::styled("╚═══════════════════════════════════╝", DefaultTheme::title()),
+            Span::styled("╚══════════════════════════╝", DefaultTheme::title()),
         ]),
     ])
     .style(DefaultTheme::header());
