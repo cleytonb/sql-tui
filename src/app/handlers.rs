@@ -211,15 +211,20 @@ impl App {
     /// Query Editor - Type and press Enter to run!
     fn handle_query_editor(&mut self, key: KeyEvent) -> Result<()> {
         match key.code {
-            // ENTER = RUN QUERY!
-            KeyCode::Enter if key.modifiers.contains(KeyModifiers::SHIFT) => {
+            // // ENTER = RUN QUERY!
+            // KeyCode::Enter if key.modifiers.contains(KeyModifiers::SHIFT) => {
+            //     // Shift+Enter = new line
+            //     self.query.insert(self.cursor_pos, '\n');
+            //     self.cursor_pos += 1;
+            // }
+            // KeyCode::Enter => {
+            //     // Plain Enter = RUN QUERY!
+            //     self.start_query();
+            // }
+            KeyCode::Enter => {
                 // Shift+Enter = new line
                 self.query.insert(self.cursor_pos, '\n');
                 self.cursor_pos += 1;
-            }
-            KeyCode::Enter => {
-                // Plain Enter = RUN QUERY!
-                self.start_query();
             }
             // F5 also runs query
             KeyCode::F(5) => {

@@ -13,6 +13,9 @@ use std::io;
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Load .env file
+    dotenvy::dotenv().ok();
+    
     // Setup terminal
     enable_raw_mode()?;
     let mut stdout = io::stdout();
