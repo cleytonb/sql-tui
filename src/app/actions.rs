@@ -5,6 +5,7 @@
 
 use crate::app::{App, ActivePanel, InputMode, SchemaNode, SchemaNodeType};
 use crate::sql::format_sql_query;
+use crate::db::SchemaExplorer;
 use anyhow::Result;
 use std::collections::HashMap;
 use tokio::sync::oneshot;
@@ -278,7 +279,9 @@ impl App {
     }
 
     /// Insert selected table/view into query
-    pub fn insert_schema_object(&mut self) {
+    pub async fn insert_schema_object(&mut self) {
+        let client_arc = self.db.client();
+        let mut client = client_arc.lock().await;
         let visible = self.get_visible_schema_nodes();
         if let Some((_, node)) = visible.get(self.schema_selected) {
             if node.node_type == SchemaNodeType::Table || node.node_type == SchemaNodeType::View {
@@ -291,6 +294,16 @@ impl App {
                 self.query.insert_str(self.cursor_pos, &insert_text);
                 self.cursor_pos += insert_text.len();
                 self.active_panel = ActivePanel::QueryEditor;
+            }
+            else if node.node_type == SchemaNodeType::Procedure {
+                let schema = node.schema.clone().unwrap_or_else(|| "dbo".to_string());
+                let name = node.name.clone();
+                if let Ok(definition) = SchemaExplorer::get_procedure_definition(&mut client, schema, name).await {
+                    self.save_undo_state();
+                    self.query = definition;
+                    self.cursor_pos = 0;
+                    self.active_panel = ActivePanel::QueryEditor;
+                }
             }
         }
     }

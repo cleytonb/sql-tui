@@ -6,7 +6,7 @@ use crossterm::event::{KeyCode, KeyEvent};
 
 impl App {
     /// Schema explorer handler
-    pub(crate) fn handle_schema(&mut self, key: KeyEvent) -> Result<()> {
+    pub(crate) async fn handle_schema(&mut self, key: KeyEvent) -> Result<()> {
         // If search mode is active, process search input
         if self.show_search_schema {
             match key.code {
@@ -64,7 +64,7 @@ impl App {
                     if !node.children.is_empty() || node.node_type == SchemaNodeType::Folder {
                         self.toggle_schema_node();
                     } else {
-                        self.insert_schema_object();
+                        self.insert_schema_object().await;
                     }
                 }
             }

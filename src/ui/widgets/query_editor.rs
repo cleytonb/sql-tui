@@ -155,7 +155,7 @@ fn highlight_sql_with_scroll(
     let mut line_starts: Vec<usize> = vec![0];
     let mut pos = 0;
     for line in &source_lines {
-        pos += line.len() + 1; // +1 for newline
+        pos += line.chars().count() + 1; // +1 for newline, use chars count not bytes!
         line_starts.push(pos);
     }
 

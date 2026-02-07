@@ -274,6 +274,35 @@ impl SchemaExplorer {
         Ok(procs)
     }
 
+    /// Get stored procedures
+    pub async fn get_procedure_definition(
+        client: &mut Client<Compat<TcpStream>>,
+        schema: String,
+        name: String,
+    ) -> Result<String> {
+        let query = format!(
+            "SELECT
+                OBJECT_NAME(object_id) AS ProcedureName,
+                definition AS ProcedureText
+            FROM sys.sql_modules
+            WHERE OBJECT_SCHEMA_NAME(object_id) = '{}' AND OBJECT_NAME(object_id) = '{}'",
+            schema, name
+        );
+
+        let stream = client.simple_query(&query).await?;
+        let row = stream.into_row().await?.context("No row count")?;
+        let definition = row.get::<&str, _>(1).unwrap_or("");
+
+        // Normalize line endings (CRLF -> LF) and tabs -> spaces
+        let normalized = definition
+            .replace("\r\n", "\n")
+            .replace('\r', "\n")
+            .replace('\t', "    ")
+            .replace("CREATE PROCEDURE", "ALTER PROCEDURE");
+
+        Ok(normalized)
+    }
+
     /// Get table row count estimate
     pub async fn get_table_row_count(
         client: &mut Client<Compat<TcpStream>>,

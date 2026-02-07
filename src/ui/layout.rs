@@ -102,8 +102,8 @@ fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
     let left_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Percentage(35),  // Query editor
-            Constraint::Percentage(65),  // Results
+            Constraint::Percentage(60),  // Query editor
+            Constraint::Percentage(40),  // Results
         ])
         .split(h_chunks[0]);
 

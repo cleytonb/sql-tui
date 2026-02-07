@@ -46,8 +46,10 @@ impl App {
             self.update_cursor_style();
 
             // Use shorter poll time for animations (smooth scroll or loading spinner)
-            let poll_duration = if self.is_loading || self.pending_scroll != 0 {
-                Duration::from_millis(25)
+            let poll_duration = if self.pending_scroll != 0 {
+                Duration::from_millis(10)
+            } else if self.is_loading {
+                Duration::from_millis(80)
             } else {
                 Duration::from_millis(100)
             };
@@ -55,7 +57,7 @@ impl App {
             if event::poll(poll_duration)? {
                 match event::read()? {
                     Event::Key(key) => {
-                        self.handle_key(key)?;
+                        self.handle_key(key).await?;
                     }
                     Event::Mouse(mouse) => {
                         self.handle_mouse(mouse)?;
@@ -90,7 +92,7 @@ impl App {
     }
 
     /// Handle keyboard input
-    fn handle_key(&mut self, key: KeyEvent) -> Result<()> {
+    async fn handle_key(&mut self, key: KeyEvent) -> Result<()> {
         // Don't process keys while loading (except quit)
         if self.is_loading {
             match (key.code, key.modifiers) {
@@ -186,7 +188,7 @@ impl App {
         match self.active_panel {
             ActivePanel::QueryEditor => self.handle_query_editor(key)?,
             ActivePanel::Results => self.handle_results(key)?,
-            ActivePanel::SchemaExplorer => self.handle_schema(key)?,
+            ActivePanel::SchemaExplorer => self.handle_schema(key).await?,
             ActivePanel::History => self.handle_history(key)?,
         }
 
@@ -276,34 +278,81 @@ impl App {
 
     /// Move cursor up one line in query
     pub(crate) fn move_cursor_up(&mut self) {
-        let text_before: String = self.query.chars().take(self.cursor_pos).collect();
-        if let Some(last_newline) = text_before.rfind('\n') {
-            let col = self.cursor_pos - last_newline - 1;
-            let before_that: String = text_before.chars().take(last_newline).collect();
-            if let Some(prev_newline) = before_that.rfind('\n') {
-                let prev_line_len = last_newline - prev_newline - 1;
-                self.cursor_pos = prev_newline + 1 + col.min(prev_line_len);
+        let chars: Vec<char> = self.query.chars().collect();
+        
+        // Find the newline before cursor (end of previous line)
+        let mut last_newline_pos: Option<usize> = None;
+        for i in (0..self.cursor_pos).rev() {
+            if chars.get(i) == Some(&'\n') {
+                last_newline_pos = Some(i);
+                break;
+            }
+        }
+        
+        if let Some(last_nl) = last_newline_pos {
+            // Current column
+            let col = self.cursor_pos - last_nl - 1;
+            
+            // Find the newline before that (end of line before previous)
+            let mut prev_newline_pos: Option<usize> = None;
+            for i in (0..last_nl).rev() {
+                if chars.get(i) == Some(&'\n') {
+                    prev_newline_pos = Some(i);
+                    break;
+                }
+            }
+            
+            if let Some(prev_nl) = prev_newline_pos {
+                let prev_line_len = last_nl - prev_nl - 1;
+                self.cursor_pos = prev_nl + 1 + col.min(prev_line_len);
             } else {
-                self.cursor_pos = col.min(last_newline);
+                // Moving to first line
+                self.cursor_pos = col.min(last_nl);
             }
         }
     }
 
     /// Move cursor down one line in query
     pub(crate) fn move_cursor_down(&mut self) {
-        let text_before: String = self.query.chars().take(self.cursor_pos).collect();
-        let text_after: String = self.query.chars().skip(self.cursor_pos).collect();
-
-        let col = if let Some(last_newline) = text_before.rfind('\n') {
-            self.cursor_pos - last_newline - 1
+        let chars: Vec<char> = self.query.chars().collect();
+        
+        // Find current column
+        let mut last_newline_pos: Option<usize> = None;
+        for i in (0..self.cursor_pos).rev() {
+            if chars.get(i) == Some(&'\n') {
+                last_newline_pos = Some(i);
+                break;
+            }
+        }
+        
+        let col = if let Some(last_nl) = last_newline_pos {
+            self.cursor_pos - last_nl - 1
         } else {
             self.cursor_pos
         };
-
-        if let Some(next_newline) = text_after.find('\n') {
-            let next_line_start = self.cursor_pos + next_newline + 1;
-            let remaining: String = self.query.chars().skip(next_line_start).collect();
-            let next_line_len = remaining.find('\n').unwrap_or(remaining.len());
+        
+        // Find next newline (end of current line)
+        let mut next_newline_pos: Option<usize> = None;
+        for i in self.cursor_pos..chars.len() {
+            if chars[i] == '\n' {
+                next_newline_pos = Some(i);
+                break;
+            }
+        }
+        
+        if let Some(next_nl) = next_newline_pos {
+            let next_line_start = next_nl + 1;
+            
+            // Find the end of next line
+            let mut next_line_end = chars.len();
+            for i in next_line_start..chars.len() {
+                if chars[i] == '\n' {
+                    next_line_end = i;
+                    break;
+                }
+            }
+            
+            let next_line_len = next_line_end - next_line_start;
             self.cursor_pos = next_line_start + col.min(next_line_len);
         }
     }
