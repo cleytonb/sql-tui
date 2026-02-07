@@ -426,19 +426,19 @@ fn draw_results_stats(f: &mut Frame, app: &App, area: Rect, active: bool) {
             Span::styled(format!("{:.2} ms", exec_ms), DefaultTheme::success()),
         ]),
         Line::from(vec![
-            Span::styled("  Linhas Retornadas:   ", DefaultTheme::dim_text()),
+            Span::styled("  Linhas Retornadas:  ", DefaultTheme::dim_text()),
             Span::styled(format_number(app.result.row_count as i64), DefaultTheme::info()),
         ]),
         Line::from(vec![
-            Span::styled("  Colunas:         ", DefaultTheme::dim_text()),
+            Span::styled("  Colunas:            ", DefaultTheme::dim_text()),
             Span::styled(format!("{}", app.result.columns.len()), DefaultTheme::info()),
         ]),
         Line::from(vec![
-            Span::styled("  Total de Células:     ", DefaultTheme::dim_text()),
+            Span::styled("  Total de Células:   ", DefaultTheme::dim_text()),
             Span::styled(format_number(total_cells as i64), DefaultTheme::normal_text()),
         ]),
         Line::from(vec![
-            Span::styled("  Valores NULL:     ", DefaultTheme::dim_text()),
+            Span::styled("  Valores NULL:       ", DefaultTheme::dim_text()),
             Span::styled(format!("{} ({:.1}%)", format_number(null_count as i64), null_percentage), DefaultTheme::warning()),
         ]),
         // Line::from(""),
