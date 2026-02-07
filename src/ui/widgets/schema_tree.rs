@@ -15,11 +15,11 @@ pub fn draw_schema_explorer(f: &mut Frame, app: &App, area: Rect, active: bool) 
 
     // Título com indicador de busca ativa
     let title = if !app.schema_search_query.is_empty() {
-        format!(" Schema [s] 🔍 {} ", app.schema_search_query)
+        format!(" Schema [<Cmd>s] 🔍 {} ", app.schema_search_query)
     } else if active {
-        " Schema [s] ▪ ".to_string()
+        " Schema [<Cmd>s] ▪ ".to_string()
     } else {
-        " Schema [s] ".to_string()
+        " Schema [<Cmd>s] ".to_string()
     };
 
     // Se o modo de busca está ativo, reserva espaço para o input

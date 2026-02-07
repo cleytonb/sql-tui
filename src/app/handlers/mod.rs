@@ -155,6 +155,10 @@ impl App {
                     self.active_panel = ActivePanel::SchemaExplorer;
                     return Ok(());
                 }
+                KeyCode::Char('h') => {
+                    self.active_panel = ActivePanel::History;
+                    return Ok(());
+                }
                 _ => {
                     self.command_mode = false;
                 }

@@ -23,7 +23,7 @@ pub fn draw_query_editor(f: &mut Frame, app: &mut App, area: Rect, active: bool)
         InputMode::Normal => "",
         InputMode::Command => "[COMMAND]",
     };
-    let title = format!(" Query [q] {} {} ", if active { "▪" } else { "" }, mode_indicator);
+    let title = format!(" Query [<Cmd>q] {} {} ", if active { "▪" } else { "" }, mode_indicator);
 
     // Create outer block
     let block = Block::default()

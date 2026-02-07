@@ -13,7 +13,7 @@ pub fn draw_history_panel(f: &mut Frame, app: &App, area: Rect, active: bool) {
         DefaultTheme::inactive_border()
     };
 
-    let title = if active { " Histórico [4] ▪ " } else { " Histórico [4] " };
+    let title = if active { " Histórico [<Cmd>h] ▪ " } else { " Histórico [<Cmd>h] " };
 
     let entries = app.history.entries();
     let items: Vec<ListItem> = entries
