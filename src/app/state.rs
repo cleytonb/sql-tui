@@ -29,6 +29,7 @@ pub enum InputMode {
     Normal,
     Insert,
     Command,
+    Visual
 }
 
 /// Schema tree node
@@ -642,12 +643,12 @@ fn format_sql_query(sql: &str) -> String {
     let keywords_newline_before = [
         "SELECT", "FROM", "WHERE", "AND", "OR", "ORDER BY", "GROUP BY",
         "HAVING", "JOIN", "INNER JOIN", "LEFT JOIN", "RIGHT JOIN",
-        "OUTER JOIN", "CROSS JOIN", "ON", "UNION", "UNION ALL",
+        "OUTER JOIN", "CROSS JOIN", "UNION", "UNION ALL",
         "INSERT INTO", "VALUES", "UPDATE", "SET", "DELETE FROM",
-        "CREATE TABLE", "ALTER TABLE", "DROP TABLE",
+        "CREATE TABLE", "ALTER TABLE", "DROP TABLE", "CROSS", "OUTER"
     ];
 
-    let keywords_newline_after = ["SELECT", "FROM"];
+    let keywords_newline_after = ["SELECT"];
 
     // Normalize whitespace
     let sql = sql.split_whitespace().collect::<Vec<_>>().join(" ");
@@ -683,9 +684,6 @@ fn format_sql_query(sql: &str) -> String {
                 "AND" | "OR" => {
                     result.push_str(&"    ".repeat(indent_level + 1));
                 }
-                "ON" => {
-                    result.push_str(&"    ".repeat(indent_level + 1));
-                }
                 _ => {
                     result.push_str(&"    ".repeat(indent_level));
                 }
@@ -713,8 +711,10 @@ fn format_sql_query(sql: &str) -> String {
             indent_level += 1;
             i += 1;
         } else if chars[i] == ')' {
-            result.push(')');
+            result.push('\n');
             indent_level = indent_level.saturating_sub(1);
+            result.push_str(&"    ".repeat(indent_level));
+            result.push(')');
             i += 1;
         } else if chars[i] == ',' {
             result.push(',');

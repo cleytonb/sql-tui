@@ -476,6 +476,10 @@ impl App {
                 KeyCode::Char('i') => {
                     self.input_mode = InputMode::Insert;
                 }
+                // Visual mode (na posição atual)
+                KeyCode::Char('v') => {
+                    self.input_mode = InputMode::Visual;
+                }
                 _ => {}
             }
         }
