@@ -4,7 +4,7 @@
 //! Business logic and async operations are in the actions module.
 
 use crate::db::{DbConfig, DbConnection, QueryResult};
-use crate::app::QueryHistory;
+use crate::app::{QueryHistory, UndoManager};
 use anyhow::Result;
 use tokio::sync::oneshot;
 
@@ -144,6 +144,10 @@ pub struct App {
     /// History scroll position
     pub history_selected: usize,
 
+    // === Undo/Redo ===
+    /// Undo manager for query editor
+    pub undo_manager: UndoManager,
+
     // === UI State ===
     /// Active panel
     pub active_panel: ActivePanel,
@@ -163,6 +167,8 @@ pub struct App {
     pub command_buffer: String,
     /// Pending smooth scroll amount (positive = down, negative = up)
     pub pending_scroll: i32,
+    /// Command mode
+    pub command_mode: bool,
 }
 
 impl App {
@@ -203,6 +209,8 @@ impl App {
             schema_search_query: String::new(),
             history: QueryHistory::new(1000),
             history_selected: 0,
+            undo_manager: UndoManager::new(1000),
+            command_mode: false,
             active_panel: ActivePanel::QueryEditor,
             should_quit: false,
             show_help: false,
@@ -335,5 +343,38 @@ impl App {
             }
         }
         false
+    }
+
+    // === Undo/Redo Helpers ===
+
+    /// Save current state before making changes
+    pub fn save_undo_state(&mut self) {
+        self.undo_manager.save_state(&self.query, self.cursor_pos);
+    }
+
+    /// Undo last change
+    pub fn undo(&mut self) -> bool {
+        if let Some(state) = self.undo_manager.undo(&self.query, self.cursor_pos) {
+            self.query = state.text;
+            self.cursor_pos = state.cursor_pos.min(self.query.len());
+            self.message = Some("Undo".to_string());
+            true
+        } else {
+            self.message = Some("Nada para desfazer".to_string());
+            false
+        }
+    }
+
+    /// Redo last undone change
+    pub fn redo(&mut self) -> bool {
+        if let Some(state) = self.undo_manager.redo(&self.query, self.cursor_pos) {
+            self.query = state.text;
+            self.cursor_pos = state.cursor_pos.min(self.query.len());
+            self.message = Some("Redo".to_string());
+            true
+        } else {
+            self.message = Some("Nada para refazer".to_string());
+            false
+        }
     }
 }

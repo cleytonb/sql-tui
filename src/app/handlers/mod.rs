@@ -131,22 +131,34 @@ impl App {
             return Ok(());
         }
 
-        // 'q' in Normal mode -> switch to QueryEditor
-        if key.code == KeyCode::Char('q') && self.input_mode == InputMode::Normal && !self.show_search_schema {
-            self.active_panel = ActivePanel::QueryEditor;
+        // 'space' for command mode
+        if key.code == KeyCode::Char(' ') && (self.active_panel != ActivePanel::QueryEditor || self.input_mode != InputMode::Insert) {
+            self.command_mode = true;
             return Ok(());
         }
 
-        // 'r' in Normal mode -> switch to Results
-        if key.code == KeyCode::Char('r') && self.input_mode == InputMode::Normal && !self.show_search_schema {
-            self.active_panel = ActivePanel::Results;
-            return Ok(());
-        }
-
-        // 's' in Normal mode -> switch to SchemaExplorer
-        if key.code == KeyCode::Char('s') && self.input_mode == InputMode::Normal && !self.show_search_schema {
-            self.active_panel = ActivePanel::SchemaExplorer;
-            return Ok(());
+        if self.command_mode {
+            match key.code {
+                KeyCode::Esc => {
+                    self.command_mode = false;
+                    return Ok(());
+                }
+                KeyCode::Char('q') => {
+                    self.active_panel = ActivePanel::QueryEditor;
+                    return Ok(());
+                }
+                KeyCode::Char('r') => {
+                    self.active_panel = ActivePanel::Results;
+                    return Ok(());
+                }
+                KeyCode::Char('s') => {
+                    self.active_panel = ActivePanel::SchemaExplorer;
+                    return Ok(());
+                }
+                _ => {
+                    self.command_mode = false;
+                }
+            }
         }
 
         // Handle based on active panel

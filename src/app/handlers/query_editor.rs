@@ -44,11 +44,13 @@ impl App {
     fn handle_insert_mode(&mut self, key: KeyEvent) -> Result<()> {
         match key.code {
             KeyCode::Enter => {
+                self.save_undo_state();
                 self.query.insert(self.cursor_pos, '\n');
                 self.cursor_pos += 1;
             }
             // Tab = insert 4 spaces for indentation
             KeyCode::Tab => {
+                self.save_undo_state();
                 let indent = "    "; // 4 spaces
                 for c in indent.chars() {
                     self.query.insert(self.cursor_pos, c);
@@ -57,12 +59,14 @@ impl App {
             }
             // Typing
             KeyCode::Char(c) => {
+                self.save_undo_state();
                 self.query.insert(self.cursor_pos, c);
                 self.cursor_pos += 1;
             }
             // Backspace
             KeyCode::Backspace => {
                 if self.cursor_pos > 0 {
+                    self.save_undo_state();
                     self.cursor_pos -= 1;
                     self.query.remove(self.cursor_pos);
                 }
@@ -70,6 +74,7 @@ impl App {
             // Delete
             KeyCode::Delete => {
                 if self.cursor_pos < self.query.len() {
+                    self.save_undo_state();
                     self.query.remove(self.cursor_pos);
                 }
             }
@@ -129,6 +134,7 @@ impl App {
                 // Paste from system clipboard
                 if let Ok(mut clipboard) = arboard::Clipboard::new() {
                     if let Ok(text) = clipboard.get_text() {
+                        self.save_undo_state();
                         for c in text.chars() {
                             self.query.insert(self.cursor_pos, c);
                             self.cursor_pos += 1;
@@ -201,9 +207,18 @@ impl App {
             KeyCode::Char('G') => {
                 self.cursor_pos = self.query.len().saturating_sub(1);
             }
+            // Undo
+            KeyCode::Char('u') => {
+                self.undo();
+            }
+            // Redo (Ctrl+R)
+            KeyCode::Char('r') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                self.redo();
+            }
             // Delete character
             KeyCode::Char('x') => {
                 if self.cursor_pos < self.query.len() {
+                    self.save_undo_state();
                     self.query.remove(self.cursor_pos);
                     if self.cursor_pos >= self.query.len() && self.cursor_pos > 0 {
                         self.cursor_pos -= 1;
@@ -212,6 +227,7 @@ impl App {
             }
             // Delete line
             KeyCode::Char('d') => {
+                self.save_undo_state();
                 let text_before: String = self.query.chars().take(self.cursor_pos).collect();
                 let line_start = if let Some(last_newline) = text_before.rfind('\n') {
                     last_newline + 1
@@ -256,6 +272,7 @@ impl App {
             }
             // New line below
             KeyCode::Char('o') => {
+                self.save_undo_state();
                 let text_after: String = self.query.chars().skip(self.cursor_pos).collect();
                 let line_end = if let Some(next_newline) = text_after.find('\n') {
                     self.cursor_pos + next_newline
@@ -268,6 +285,7 @@ impl App {
             }
             // New line above
             KeyCode::Char('O') => {
+                self.save_undo_state();
                 let text_before: String = self.query.chars().take(self.cursor_pos).collect();
                 let line_start = if let Some(last_newline) = text_before.rfind('\n') {
                     last_newline + 1
@@ -281,6 +299,7 @@ impl App {
             // Change character
             KeyCode::Char('c') => {
                 if self.cursor_pos < self.query.len() {
+                    self.save_undo_state();
                     self.query.remove(self.cursor_pos);
                     if self.cursor_pos >= self.query.len() && self.cursor_pos > 0 {
                         self.cursor_pos -= 1;
@@ -381,6 +400,7 @@ impl App {
             }
             // Delete selection
             KeyCode::Char('d') | KeyCode::Char('x') => {
+                self.save_undo_state();
                 let text = self.get_selected_text();
                 if let Ok(mut clipboard) = arboard::Clipboard::new() {
                     let _ = clipboard.set_text(&text);
@@ -390,6 +410,7 @@ impl App {
             }
             // Change (delete and enter insert mode)
             KeyCode::Char('c') => {
+                self.save_undo_state();
                 let text = self.get_selected_text();
                 if let Ok(mut clipboard) = arboard::Clipboard::new() {
                     let _ = clipboard.set_text(&text);

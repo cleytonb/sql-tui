@@ -298,8 +298,13 @@ impl App {
     /// Load history entry into query
     pub fn load_history_entry(&mut self) {
         let entries = self.history.entries();
-        if let Some(entry) = entries.get(entries.len().saturating_sub(1).saturating_sub(self.history_selected)) {
-            self.query = entry.query.clone();
+        let entry_query = entries
+            .get(entries.len().saturating_sub(1).saturating_sub(self.history_selected))
+            .map(|e| e.query.clone());
+        
+        if let Some(query) = entry_query {
+            self.save_undo_state();
+            self.query = query;
             self.cursor_pos = self.query.len();
             self.active_panel = ActivePanel::QueryEditor;
         }
@@ -307,6 +312,7 @@ impl App {
 
     /// Format SQL query with proper indentation and line breaks
     pub fn format_sql(&mut self) {
+        self.save_undo_state();
         let formatted = format_sql_query(&self.query);
         self.query = formatted;
         self.cursor_pos = self.query.len();
