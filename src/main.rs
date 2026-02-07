@@ -4,6 +4,7 @@
 use anyhow::Result;
 use sql_tui::app::App;
 use crossterm::{
+    cursor::SetCursorStyle,
     event::{DisableMouseCapture, EnableMouseCapture},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
@@ -32,7 +33,8 @@ async fn main() -> Result<()> {
     execute!(
         terminal.backend_mut(),
         LeaveAlternateScreen,
-        DisableMouseCapture
+        DisableMouseCapture,
+        SetCursorStyle::DefaultUserShape  // Restore default cursor
     )?;
     terminal.show_cursor()?;
 

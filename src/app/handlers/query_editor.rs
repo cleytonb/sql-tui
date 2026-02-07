@@ -116,6 +116,21 @@ impl App {
 
     /// Handle Normal mode - vim commands
     fn handle_normal_mode(&mut self, key: KeyEvent) -> Result<()> {
+        // Handle pending character search (f/F/t/T waiting for char)
+        if let Some(pending) = self.pending_char_search {
+            self.pending_char_search = None;
+            if let KeyCode::Char(ch) = key.code {
+                match pending {
+                    'f' => { self.find_char_forward(ch, false); }
+                    'F' => { self.find_char_backward(ch, false); }
+                    't' => { self.find_char_forward(ch, true); }
+                    'T' => { self.find_char_backward(ch, true); }
+                    _ => {}
+                }
+            }
+            return Ok(());
+        }
+
         match key.code {
             // Movement
             KeyCode::Char('h') | KeyCode::Left => {
@@ -199,6 +214,30 @@ impl App {
                     pos -= 1;
                 }
                 self.cursor_pos = pos;
+            }
+            // Find character forward (f)
+            KeyCode::Char('f') => {
+                self.pending_char_search = Some('f');
+            }
+            // Find character backward (F)
+            KeyCode::Char('F') => {
+                self.pending_char_search = Some('F');
+            }
+            // Till character forward (t)
+            KeyCode::Char('t') => {
+                self.pending_char_search = Some('t');
+            }
+            // Till character backward (T)
+            KeyCode::Char('T') => {
+                self.pending_char_search = Some('T');
+            }
+            // Repeat last f/F/t/T search (;)
+            KeyCode::Char(';') => {
+                self.repeat_char_search();
+            }
+            // Repeat last f/F/t/T search in opposite direction (,)
+            KeyCode::Char(',') => {
+                self.repeat_char_search_opposite();
             }
             // Document start/end
             KeyCode::Char('g') => {
@@ -323,6 +362,21 @@ impl App {
 
     /// Handle Visual mode - text selection
     fn handle_visual_mode(&mut self, key: KeyEvent) -> Result<()> {
+        // Handle pending character search (f/F/t/T waiting for char)
+        if let Some(pending) = self.pending_char_search {
+            self.pending_char_search = None;
+            if let KeyCode::Char(ch) = key.code {
+                match pending {
+                    'f' => { self.find_char_forward(ch, false); }
+                    'F' => { self.find_char_backward(ch, false); }
+                    't' => { self.find_char_forward(ch, true); }
+                    'T' => { self.find_char_backward(ch, true); }
+                    _ => {}
+                }
+            }
+            return Ok(());
+        }
+
         match key.code {
             // Exit visual mode
             KeyCode::Esc | KeyCode::Char('v') => {
@@ -381,6 +435,30 @@ impl App {
                     pos -= 1;
                 }
                 self.cursor_pos = pos;
+            }
+            // Find character forward (f)
+            KeyCode::Char('f') => {
+                self.pending_char_search = Some('f');
+            }
+            // Find character backward (F)
+            KeyCode::Char('F') => {
+                self.pending_char_search = Some('F');
+            }
+            // Till character forward (t)
+            KeyCode::Char('t') => {
+                self.pending_char_search = Some('t');
+            }
+            // Till character backward (T)
+            KeyCode::Char('T') => {
+                self.pending_char_search = Some('T');
+            }
+            // Repeat last f/F/t/T search (;)
+            KeyCode::Char(';') => {
+                self.repeat_char_search();
+            }
+            // Repeat last f/F/t/T search in opposite direction (,)
+            KeyCode::Char(',') => {
+                self.repeat_char_search_opposite();
             }
             // Document start/end
             KeyCode::Char('g') => {

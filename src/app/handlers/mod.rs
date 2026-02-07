@@ -7,11 +7,25 @@ mod history_handler;
 
 use crate::app::{App, ActivePanel, ResultsTab, SPINNER_FRAMES, InputMode};
 use anyhow::Result;
+use crossterm::cursor::SetCursorStyle;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
+use crossterm::execute;
 use ratatui::prelude::*;
+use std::io;
 use std::time::Duration;
 
 impl App {
+    /// Update terminal cursor style based on current input mode
+    fn update_cursor_style(&self) {
+        let style = match self.input_mode {
+            InputMode::Insert => SetCursorStyle::BlinkingBar,
+            InputMode::Normal => SetCursorStyle::BlinkingBlock,
+            InputMode::Visual => SetCursorStyle::SteadyBlock,
+            InputMode::Command => SetCursorStyle::BlinkingBar,
+        };
+        let _ = execute!(io::stdout(), style);
+    }
+
     /// Main event loop
     pub async fn run<B: Backend>(&mut self, terminal: &mut Terminal<B>) -> Result<()> {
         loop {
@@ -27,6 +41,9 @@ impl App {
             }
 
             terminal.draw(|f| crate::ui::draw(f, self))?;
+
+            // Update cursor style based on input mode (vim-like)
+            self.update_cursor_style();
 
             // Use shorter poll time for animations (smooth scroll or loading spinner)
             let poll_duration = if self.is_loading || self.pending_scroll != 0 {

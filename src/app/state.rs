@@ -101,6 +101,11 @@ pub struct App {
     pub input_mode: InputMode,
     /// Visual mode selection anchor (start position)
     pub visual_anchor: usize,
+    /// Last character search for f/F/t/T with ; and , repeat
+    /// (character, is_forward, is_till)
+    pub last_char_search: Option<(char, bool, bool)>,
+    /// Pending operator waiting for character input (f, F, t, T)
+    pub pending_char_search: Option<char>,
 
     // === Query Execution ===
     /// Current query result
@@ -192,6 +197,8 @@ impl App {
             query_scroll_y: 0,
             input_mode: InputMode::Insert,
             visual_anchor: 0,
+            last_char_search: None,
+            pending_char_search: None,
             result: QueryResult::empty(),
             is_loading: false,
             pending_query: None,
@@ -374,6 +381,78 @@ impl App {
             true
         } else {
             self.message = Some("Nada para refazer".to_string());
+            false
+        }
+    }
+
+    // === Character Search (f/F/t/T) ===
+
+    /// Find character forward (f command)
+    /// Returns the new cursor position if found
+    pub fn find_char_forward(&mut self, ch: char, till: bool) -> bool {
+        let chars: Vec<char> = self.query.chars().collect();
+        let start = self.cursor_pos + 1;
+        
+        for i in start..chars.len() {
+            // Stop at newline - f/F only work within current line
+            if chars[i] == '\n' {
+                return false;
+            }
+            if chars[i] == ch {
+                self.cursor_pos = if till { i.saturating_sub(1) } else { i };
+                self.last_char_search = Some((ch, true, till));
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Find character backward (F command)
+    /// Returns the new cursor position if found
+    pub fn find_char_backward(&mut self, ch: char, till: bool) -> bool {
+        let chars: Vec<char> = self.query.chars().collect();
+        
+        if self.cursor_pos == 0 {
+            return false;
+        }
+        
+        for i in (0..self.cursor_pos).rev() {
+            // Stop at newline - f/F only work within current line
+            if chars[i] == '\n' {
+                return false;
+            }
+            if chars[i] == ch {
+                self.cursor_pos = if till { (i + 1).min(self.cursor_pos) } else { i };
+                self.last_char_search = Some((ch, false, till));
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Repeat last character search (;)
+    pub fn repeat_char_search(&mut self) -> bool {
+        if let Some((ch, forward, till)) = self.last_char_search {
+            if forward {
+                self.find_char_forward(ch, till)
+            } else {
+                self.find_char_backward(ch, till)
+            }
+        } else {
+            false
+        }
+    }
+
+    /// Repeat last character search in opposite direction (,)
+    pub fn repeat_char_search_opposite(&mut self) -> bool {
+        if let Some((ch, forward, till)) = self.last_char_search {
+            // Search in opposite direction
+            if forward {
+                self.find_char_backward(ch, till)
+            } else {
+                self.find_char_forward(ch, till)
+            }
+        } else {
             false
         }
     }
