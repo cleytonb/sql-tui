@@ -13,6 +13,9 @@ impl App {
             // Check for query completion
             self.check_query_completion();
 
+            // Process smooth scroll animation
+            self.process_smooth_scroll();
+
             // Advance spinner animation when loading
             if self.is_loading {
                 self.spinner_frame = (self.spinner_frame + 1) % SPINNER_FRAMES.len();
@@ -20,9 +23,9 @@ impl App {
 
             terminal.draw(|f| crate::ui::draw(f, self))?;
 
-            // Use shorter poll time for smoother spinner animation
-            let poll_duration = if self.is_loading {
-                Duration::from_millis(80)
+            // Use shorter poll time for animations (smooth scroll or loading spinner)
+            let poll_duration = if self.is_loading || self.pending_scroll != 0 {
+                Duration::from_millis(25)
             } else {
                 Duration::from_millis(100)
             };
@@ -45,6 +48,23 @@ impl App {
         }
 
         Ok(())
+    }
+
+    /// Process one step of smooth scroll animation
+    fn process_smooth_scroll(&mut self) {
+        if self.pending_scroll == 0 {
+            return;
+        }
+
+        if self.pending_scroll > 0 {
+            self.scroll_down(1);
+            self.move_cursor_down();
+            self.pending_scroll -= 1;
+        } else {
+            self.scroll_up(1);
+            self.move_cursor_up();
+            self.pending_scroll += 1;
+        }
     }
 
     /// Handle keyboard input - SIMPLIFIED!
@@ -161,11 +181,11 @@ impl App {
             ActivePanel::Results => {
                 match self.results_tab {
                     ResultsTab::Data => {
-                        self.results_selected = self.results_selected.saturating_sub(amount);
+                        self.results_selected = self.results_selected.saturating_sub(amount).max(0);
                     }
                     ResultsTab::Columns => {
                         // Columns tab shows columns vertically, so scroll vertically
-                        self.results_selected = self.results_selected.saturating_sub(amount);
+                        self.results_selected = self.results_selected.saturating_sub(amount).max(0);
                     }
                     ResultsTab::Stats => {
                         // Stats view doesn't need scrolling (it's short)
@@ -173,14 +193,14 @@ impl App {
                 }
             }
             ActivePanel::SchemaExplorer => {
-                self.schema_selected = self.schema_selected.saturating_sub(amount);
+                self.schema_selected = self.schema_selected.saturating_sub(amount).max(0);
             }
             ActivePanel::History => {
-                self.history_selected = self.history_selected.saturating_sub(amount);
+                self.history_selected = self.history_selected.saturating_sub(amount).max(0);
             }
             ActivePanel::QueryEditor => {
                 // Scroll query view
-                self.query_scroll_y = self.query_scroll_y.saturating_sub(amount);
+                self.query_scroll_y = self.query_scroll_y.saturating_sub(amount).max(0);
             }
         }
     }
@@ -232,6 +252,18 @@ impl App {
             // Ctrl+F = Format SQL
             KeyCode::Char('f') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 self.format_sql();
+                return Ok(());
+            }
+            // Ctrl+D = Smooth scroll down
+            KeyCode::Char('d') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                // Smooth scroll down - add to pending scroll
+                self.pending_scroll += 10;
+                return Ok(());
+            }
+            // Ctrl+U = Smooth scroll up
+            KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                // Smooth scroll up - subtract from pending scroll
+                self.pending_scroll -= 10;
                 return Ok(());
             }
             _ => {}
@@ -318,6 +350,18 @@ impl App {
                 }
                 KeyCode::Char('j') | KeyCode::Down => {
                     self.move_cursor_down();
+                }
+                KeyCode::Char('p') => {
+                    // Paste from system clipboard
+                    if let Ok(mut clipboard) = arboard::Clipboard::new() {
+                        if let Ok(text) = clipboard.get_text() {
+                            // Insert text at cursor position
+                            for c in text.chars() {
+                                self.query.insert(self.cursor_pos, c);
+                                self.cursor_pos += 1;
+                            }
+                        }
+                    }
                 }
                 // Início/fim da linha
                 KeyCode::Char('0') | KeyCode::Home => {

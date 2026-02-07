@@ -171,6 +171,9 @@ pub struct App {
 
     /// Search query for schema explorer
     pub schema_search_query: String,
+
+    /// Pending smooth scroll amount (positive = down, negative = up)
+    pub pending_scroll: i32,
 }
 
 /// Spinner animation frames
@@ -221,6 +224,7 @@ impl App {
             query_scroll_y: 0,
             show_search_schema: false,
             schema_search_query: String::new(),
+            pending_scroll: 0,
         };
 
         // Load initial schema
