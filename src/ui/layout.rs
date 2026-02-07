@@ -1,6 +1,6 @@
 //! Layout management
 
-use crate::app::{App, ActivePanel, SPINNER_FRAMES, InputMode};
+use crate::app::{App, ActivePanel, SPINNER_FRAMES};
 use crate::ui::{DefaultTheme, draw_query_editor, draw_results_table, draw_schema_explorer, draw_history_panel};
 use ratatui::prelude::*;
 use ratatui::widgets::{Block, Borders, Paragraph, Clear};

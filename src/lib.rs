@@ -3,5 +3,6 @@
 
 pub mod app;
 pub mod db;
+pub mod sql;
 pub mod ui;
 pub mod utils;
