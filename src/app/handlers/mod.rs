@@ -228,6 +228,7 @@ impl App {
                     }
                     ResultsTab::Stats => {
                         // Stats view doesn't need scrolling (it's short)
+                        self.results_selected = self.results_selected.saturating_sub(amount);
                     }
                 }
             }
@@ -258,6 +259,8 @@ impl App {
                     }
                     ResultsTab::Stats => {
                         // Stats view doesn't need scrolling
+                        let max_cols = self.result.columns.len().saturating_sub(1);
+                        self.results_selected = (self.results_selected + amount).min(max_cols);
                     }
                 }
             }

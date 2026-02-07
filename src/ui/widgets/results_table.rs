@@ -417,7 +417,7 @@ fn draw_results_stats(f: &mut Frame, app: &App, area: Rect, active: bool) {
     };
 
     // Build stats text
-    let mut stats_lines: Vec<Line> = vec![
+    let stats_lines: Vec<Line> = vec![
         Line::from(""),
         Line::from(Span::styled("═══ ESTATÍSTICAS DA QUERY ═══", DefaultTheme::info())),
         Line::from(""),
@@ -441,43 +441,43 @@ fn draw_results_stats(f: &mut Frame, app: &App, area: Rect, active: bool) {
             Span::styled("  Valores NULL:     ", DefaultTheme::dim_text()),
             Span::styled(format!("{} ({:.1}%)", format_number(null_count as i64), null_percentage), DefaultTheme::warning()),
         ]),
-        Line::from(""),
-        Line::from(Span::styled("═══ TIPOS DE DADOS ═══", DefaultTheme::info())),
-        Line::from(""),
+        // Line::from(""),
+        // Line::from(Span::styled("═══ TIPOS DE DADOS ═══", DefaultTheme::info())),
+        // Line::from(""),
     ];
 
     // Add type breakdown
-    let mut type_vec: Vec<(&String, &usize)> = type_counts.iter().collect();
-    type_vec.sort_by(|a, b| b.1.cmp(a.1));
+    // let mut type_vec: Vec<(&String, &usize)> = type_counts.iter().collect();
+    // type_vec.sort_by(|a, b| b.1.cmp(a.1));
 
-    for (type_name, count) in type_vec.iter().take(10) {
-        let indicator = get_type_indicator(type_name);
-        stats_lines.push(Line::from(vec![
-            Span::styled(format!("  {} ", indicator), DefaultTheme::normal_text()),
-            Span::styled(format!("{:<20}", type_name), DefaultTheme::dim_text()),
-            Span::styled(format!("{:>5} coluna(s)", count), DefaultTheme::normal_text()),
-        ]));
-    }
+    // for (type_name, count) in type_vec.iter().take(10) {
+    //     let indicator = get_type_indicator(type_name);
+    //     stats_lines.push(Line::from(vec![
+    //         Span::styled(format!("  {} ", indicator), DefaultTheme::normal_text()),
+    //         Span::styled(format!("{:<20}", type_name), DefaultTheme::dim_text()),
+    //         Span::styled(format!("{:>5} coluna(s)", count), DefaultTheme::normal_text()),
+    //     ]));
+    // }
 
-    stats_lines.push(Line::from(""));
-    stats_lines.push(Line::from(Span::styled("═══ ATALHOS ═══", DefaultTheme::info())));
-    stats_lines.push(Line::from(""));
-    stats_lines.push(Line::from(vec![
-        Span::styled("  Ctrl+E  ", DefaultTheme::info()),
-        Span::styled("Exportar para CSV", DefaultTheme::dim_text()),
-    ]));
-    stats_lines.push(Line::from(vec![
-        Span::styled("  Ctrl+S  ", DefaultTheme::info()),
-        Span::styled("Exportar para JSON", DefaultTheme::dim_text()),
-    ]));
-    stats_lines.push(Line::from(vec![
-        Span::styled("  Ctrl+I  ", DefaultTheme::info()),
-        Span::styled("Copiar linha como INSERT", DefaultTheme::dim_text()),
-    ]));
-    stats_lines.push(Line::from(vec![
-        Span::styled("  Ctrl+Y  ", DefaultTheme::info()),
-        Span::styled("Copiar valor da célula", DefaultTheme::dim_text()),
-    ]));
+    // stats_lines.push(Line::from(""));
+    // stats_lines.push(Line::from(Span::styled("═══ ATALHOS ═══", DefaultTheme::info())));
+    // stats_lines.push(Line::from(""));
+    // stats_lines.push(Line::from(vec![
+    //     Span::styled("  Ctrl+E  ", DefaultTheme::info()),
+    //     Span::styled("Exportar para CSV", DefaultTheme::dim_text()),
+    // ]));
+    // stats_lines.push(Line::from(vec![
+    //     Span::styled("  Ctrl+S  ", DefaultTheme::info()),
+    //     Span::styled("Exportar para JSON", DefaultTheme::dim_text()),
+    // ]));
+    // stats_lines.push(Line::from(vec![
+    //     Span::styled("  Ctrl+I  ", DefaultTheme::info()),
+    //     Span::styled("Copiar linha como INSERT", DefaultTheme::dim_text()),
+    // ]));
+    // stats_lines.push(Line::from(vec![
+    //     Span::styled("  Ctrl+Y  ", DefaultTheme::info()),
+    //     Span::styled("Copiar valor da célula", DefaultTheme::dim_text()),
+    // ]));
 
     let stats_widget = Paragraph::new(stats_lines)
         .block(
