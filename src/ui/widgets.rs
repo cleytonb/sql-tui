@@ -216,7 +216,7 @@ fn draw_results_data(f: &mut Frame, app: &mut App, area: Rect, active: bool) {
 
     // Calculate which columns to show based on horizontal scroll
     // Each column gets a fixed width for consistent display
-    let col_width: u16 = 20; // Fixed column width
+    let col_width: u16 = 30; // Fixed column width
     let cols_that_fit = ((available_width as u16).saturating_sub(row_num_width) / col_width).max(1) as usize;
 
     // Atualiza número de colunas visíveis para uso no handler
