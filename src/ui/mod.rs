@@ -28,6 +28,11 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     if app.show_help {
         draw_help_popup(f, size);
     }
+
+    // Draw connection modal if active
+    if app.show_connection_modal {
+        draw_connection_modal(f, app, size);
+    }
 }
 
 /// Draw loading spinner popup

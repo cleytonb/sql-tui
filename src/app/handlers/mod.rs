@@ -1,5 +1,6 @@
 //! Event handlers for the application
 
+mod connection;
 mod query_editor;
 mod results;
 mod schema;
@@ -120,6 +121,11 @@ impl App {
             _ => {}
         }
 
+        // Connection modal takes priority
+        if self.show_connection_modal {
+            return self.handle_connection_modal(key).await;
+        }
+
         // Help toggle
         if key.code == KeyCode::F(1) {
             self.show_help = !self.show_help;
@@ -163,19 +169,29 @@ impl App {
                     return Ok(());
                 }
                 KeyCode::Char('q') => {
+                    self.command_mode = false;
                     self.active_panel = ActivePanel::QueryEditor;
                     return Ok(());
                 }
                 KeyCode::Char('r') => {
+                    self.command_mode = false;
                     self.active_panel = ActivePanel::Results;
                     return Ok(());
                 }
                 KeyCode::Char('s') => {
+                    self.command_mode = false;
                     self.active_panel = ActivePanel::SchemaExplorer;
                     return Ok(());
                 }
                 KeyCode::Char('h') => {
+                    self.command_mode = false;
                     self.active_panel = ActivePanel::History;
+                    return Ok(());
+                }
+                KeyCode::Char('c') => {
+                    self.command_mode = false;
+                    self.show_connection_modal = true;
+                    self.update_form_from_selection();
                     return Ok(());
                 }
                 _ => {

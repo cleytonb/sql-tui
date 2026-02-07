@@ -2,6 +2,7 @@
 //! High-performance database client for enterprise use
 
 pub mod app;
+pub mod config;
 pub mod db;
 pub mod sql;
 pub mod ui;

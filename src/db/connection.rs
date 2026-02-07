@@ -1,5 +1,6 @@
 //! SQL Server connection management
 
+use crate::config::ConnectionConfig;
 use anyhow::{Context, Result};
 use tiberius::{Client, Config, AuthMethod};
 use tokio::net::TcpStream;
@@ -52,6 +53,20 @@ impl DbConnection {
         })
     }
 
+    /// Create a new database connection from a ConnectionConfig
+    pub async fn from_config(conn_config: &ConnectionConfig) -> Result<Self> {
+        let db_config = DbConfig {
+            host: conn_config.host.clone(),
+            port: conn_config.port,
+            user: conn_config.user.clone(),
+            password: conn_config.password.clone(),
+            database: conn_config.database.clone(),
+            encrypt: false,
+            trust_cert: true,
+        };
+        Self::new(db_config).await
+    }
+
     /// Connect to SQL Server
     async fn connect(db_config: &DbConfig) -> Result<Client<Compat<TcpStream>>> {
         let mut config = Config::new();
@@ -69,7 +84,6 @@ impl DbConnection {
             config.encryption(tiberius::EncryptionLevel::NotSupported);
         }
 
-        println!("{}", config.get_addr());
         let tcp = TcpStream::connect(config.get_addr())
             .await
             .context("Failed to connect to SQL Server")?;

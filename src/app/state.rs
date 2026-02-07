@@ -3,7 +3,8 @@
 //! This module contains the main App struct and related types.
 //! Business logic and async operations are in the actions module.
 
-use crate::db::{DbConfig, DbConnection, QueryResult};
+use crate::config::{AppConfig, ConnectionConfig, ConnectionForm};
+use crate::db::{DbConnection, QueryResult};
 use crate::app::{QueryHistory, UndoManager};
 use anyhow::Result;
 use tokio::sync::oneshot;
@@ -82,11 +83,34 @@ impl SchemaNode {
 /// Spinner animation frames
 pub const SPINNER_FRAMES: &[&str] = &["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
+/// Which panel is focused in the connection modal
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ConnectionModalFocus {
+    /// Left panel - list of connections
+    List,
+    /// Right panel - connection form
+    Form,
+}
+
 /// Main application state
 pub struct App {
     // === Database ===
-    /// Database connection
-    pub db: DbConnection,
+    /// Database connection (None when not connected yet)
+    pub db: Option<DbConnection>,
+
+    // === Connection Management ===
+    /// Application configuration (saved connections)
+    pub app_config: AppConfig,
+    /// Show connection modal
+    pub show_connection_modal: bool,
+    /// Selected index in connection list (includes "+ Criar nova" at the end)
+    pub connection_list_selected: usize,
+    /// Connection form for editing/creating
+    pub connection_form: ConnectionForm,
+    /// Current focused field in the form (0-5)
+    pub connection_form_focus: usize,
+    /// Which panel is focused in the modal
+    pub connection_modal_focus: ConnectionModalFocus,
 
     // === Query Editor ===
     /// Current query text
@@ -177,20 +201,43 @@ pub struct App {
 }
 
 impl App {
-    /// Create new app with database connection
+    /// Create new app, attempting to auto-connect to last used connection
     pub async fn new() -> Result<Self> {
-        let config = DbConfig::default();
-        let db = DbConnection::new(config).await?;
+        let app_config = AppConfig::load();
+        
+        // Try to connect to the last used connection
+        let (db, show_modal, server_version) = if let Some(ref last_name) = app_config.last_connection {
+            if let Some(conn_config) = app_config.get_connection(last_name) {
+                match DbConnection::from_config(conn_config).await {
+                    Ok(db) => {
+                        let version = db.get_server_version().await
+                            .unwrap_or_else(|_| "Unknown".to_string());
+                        let short = version.lines().next().unwrap_or("SQL Server").to_string();
+                        (Some(db), false, short)
+                    }
+                    Err(_) => (None, true, String::new()),
+                }
+            } else {
+                (None, true, String::new())
+            }
+        } else {
+            (None, true, String::new())
+        };
 
-        let server_version = db.get_server_version().await.unwrap_or_else(|_| "Unknown".to_string());
-        let short_version = server_version.lines().next().unwrap_or("SQL Server").to_string();
+        let is_connected = db.is_some();
 
         // Default query for quick testing
-        let default_query = "SELECT TOP 2 * FROM pmt.Contas".to_string();
+        let default_query = "SELECT TOP 10 * FROM sys.tables".to_string();
         let cursor_pos = default_query.len();
 
         let mut app = Self {
             db,
+            app_config,
+            show_connection_modal: show_modal,
+            connection_list_selected: 0,
+            connection_form: ConnectionForm::new_empty(),
+            connection_form_focus: 0,
+            connection_modal_focus: ConnectionModalFocus::List,
             query: default_query,
             cursor_pos,
             query_scroll_x: 0,
@@ -222,20 +269,74 @@ impl App {
             should_quit: false,
             show_help: false,
             error: None,
-            message: Some("Conectado ao SQL Server".to_string()),
-            status: format!("Conectado | {}", short_version),
-            server_version: short_version,
+            message: if is_connected { Some("Conectado ao SQL Server".to_string()) } else { None },
+            status: if is_connected { format!("Conectado | {}", server_version) } else { "Desconectado".to_string() },
+            server_version,
             command_buffer: String::new(),
             pending_scroll: 0,
         };
 
-        // Load initial schema
-        app.load_schema().await?;
-
-        // Auto-execute default query to show results on startup
-        app.execute_default_query().await;
+        // If connected, load schema and execute default query
+        if is_connected {
+            let _ = app.load_schema().await;
+            app.execute_default_query().await;
+        }
 
         Ok(app)
+    }
+
+    /// Check if connected to a database
+    pub fn is_connected(&self) -> bool {
+        self.db.is_some()
+    }
+
+    /// Get database connection reference (panics if not connected)
+    pub fn db(&self) -> &DbConnection {
+        self.db.as_ref().expect("Not connected to database")
+    }
+
+    /// Get mutable database connection reference (panics if not connected)
+    pub fn db_mut(&mut self) -> &mut DbConnection {
+        self.db.as_mut().expect("Not connected to database")
+    }
+
+    /// Connect to a database using the given config
+    pub async fn connect(&mut self, config: &ConnectionConfig) -> Result<()> {
+        let db = DbConnection::from_config(config).await?;
+        
+        let version = db.get_server_version().await
+            .unwrap_or_else(|_| "Unknown".to_string());
+        let short_version = version.lines().next().unwrap_or("SQL Server").to_string();
+        
+        self.db = Some(db);
+        self.server_version = short_version.clone();
+        self.status = format!("Conectado | {}", short_version);
+        self.message = Some(format!("Conectado a {}", config.name));
+        self.show_connection_modal = false;
+        
+        // Update last connection and save config
+        self.app_config.set_last_connection(&config.name);
+        let _ = self.app_config.save();
+        
+        // Load schema
+        let _ = self.load_schema().await;
+        
+        Ok(())
+    }
+
+    /// Get the number of items in the connection list (connections + "Criar nova")
+    pub fn connection_list_len(&self) -> usize {
+        self.app_config.connections.len() + 1  // +1 for "Criar nova"
+    }
+
+    /// Check if the selected item is "Criar nova"
+    pub fn is_create_new_selected(&self) -> bool {
+        self.connection_list_selected >= self.app_config.connections.len()
+    }
+
+    /// Get selected connection config (None if "Criar nova" is selected)
+    pub fn get_selected_connection(&self) -> Option<&ConnectionConfig> {
+        self.app_config.connections.get(self.connection_list_selected)
     }
 
     // === Query State Helpers ===

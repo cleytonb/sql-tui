@@ -56,18 +56,29 @@ fn draw_header(f: &mut Frame, app: &App, area: Rect) {
     .style(DefaultTheme::header());
     f.render_widget(logo, header_chunks[0]);
 
-    // Connection info (app.db.config.database tem que ter replace de Evermart para Checkout)
-    let database = app.db.config.database.replace("Evermart", "Checkout");
-    let conn_info = Paragraph::new(vec![
-        Line::from(""),
-        Line::from(vec![
-            Span::styled("● ", DefaultTheme::success()),
-            Span::styled(&database, DefaultTheme::normal_text()),
-            Span::styled(" @ ", DefaultTheme::dim_text()),
-            Span::styled(&app.db.config.host, DefaultTheme::dim_text()),
-        ]),
-        Line::from(""),
-    ])
+    // Connection info
+    let conn_info = if let Some(ref db) = app.db {
+        let database = db.config.database.replace("Evermart", "Checkout");
+        Paragraph::new(vec![
+            Line::from(""),
+            Line::from(vec![
+                Span::styled("● ", DefaultTheme::success()),
+                Span::styled(database, DefaultTheme::normal_text()),
+                Span::styled(" @ ", DefaultTheme::dim_text()),
+                Span::styled(&db.config.host, DefaultTheme::dim_text()),
+            ]),
+            Line::from(""),
+        ])
+    } else {
+        Paragraph::new(vec![
+            Line::from(""),
+            Line::from(vec![
+                Span::styled("○ ", DefaultTheme::dim_text()),
+                Span::styled("Desconectado", DefaultTheme::dim_text()),
+            ]),
+            Line::from(""),
+        ])
+    }
     .style(DefaultTheme::header());
     f.render_widget(conn_info, header_chunks[1]);
 
@@ -187,7 +198,7 @@ pub fn draw_help_popup(f: &mut Frame, area: Rect) {
         Line::from("Vencedores não precisam de ajuda"),
         Line::from(""),
         Line::from(""),
-        Line::from("\"Mais um dia para provar que o rock não morreu - Mel\"")
+        Line::from("\"Mais um dia para provar que o rock não morreu\" - Mel")
     ];
 
     let help = Paragraph::new(help_text)

@@ -13,12 +13,13 @@ use tokio::sync::oneshot;
 impl App {
     /// Execute the default query on startup
     pub async fn execute_default_query(&mut self) {
-        if self.query.is_empty() {
+        if self.query.is_empty() || !self.is_connected() {
             return;
         }
 
-        let client_arc = self.db.client();
+        let client_arc = self.db().client();
         let mut client = client_arc.lock().await;
+        let database = self.db().config.database.clone();
 
         match crate::db::QueryExecutor::execute(&mut client, &self.query).await {
             Ok(result) => {
@@ -29,7 +30,7 @@ impl App {
                     self.query.clone(),
                     exec_time,
                     Some(row_count),
-                    self.db.config.database.clone(),
+                    database,
                 );
 
                 self.message = Some(format!(
@@ -51,7 +52,11 @@ impl App {
 
     /// Load schema tree from database
     pub async fn load_schema(&mut self) -> Result<()> {
-        let client_arc = self.db.client();
+        if !self.is_connected() {
+            return Ok(());
+        }
+
+        let client_arc = self.db().client();
         let mut client = client_arc.lock().await;
 
         // Create root folders
@@ -141,6 +146,11 @@ impl App {
 
     /// Start query execution (non-blocking)
     pub fn start_query(&mut self) {
+        if !self.is_connected() {
+            self.error = Some("Não conectado ao banco de dados".to_string());
+            return;
+        }
+
         let query_text = if self.input_mode == InputMode::Visual {
             self.get_selected_text()
         } else {
@@ -157,7 +167,7 @@ impl App {
         self.spinner_frame = 0;
 
         let (tx, rx) = oneshot::channel();
-        let client_arc = self.db.client();
+        let client_arc = self.db().client();
 
         self.pending_query = Some(rx);
         self.pending_query_text = Some(query_text.clone());
@@ -193,11 +203,15 @@ impl App {
                             let exec_time = query_result.execution_time.as_millis() as u64;
 
                             if let Some(ref query_text) = self.pending_query_text {
+                                let database = self.db
+                                    .as_ref()
+                                    .map(|d| d.config.database.clone())
+                                    .unwrap_or_default();
                                 self.history.add(
                                     query_text.clone(),
                                     exec_time,
                                     Some(row_count),
-                                    self.db.config.database.clone(),
+                                    database,
                                 );
                             }
 
@@ -280,7 +294,11 @@ impl App {
 
     /// Insert selected table/view into query
     pub async fn insert_schema_object(&mut self) {
-        let client_arc = self.db.client();
+        if !self.is_connected() {
+            return;
+        }
+
+        let client_arc = self.db().client();
         let mut client = client_arc.lock().await;
         let visible = self.get_visible_schema_nodes();
         if let Some((_, node)) = visible.get(self.schema_selected) {
