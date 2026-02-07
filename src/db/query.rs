@@ -1,7 +1,7 @@
 //! Query execution and result handling
 
 use anyhow::Result;
-use tiberius::time::chrono::{NaiveDate, NaiveDateTime, NaiveTime};
+use tiberius::time::chrono::{DateTime, FixedOffset, NaiveDate, NaiveDateTime, NaiveTime};
 use std::time::{Duration, Instant};
 use tiberius::{Client, Column, ColumnType, Row, numeric::Numeric};
 use tokio::net::TcpStream;
@@ -158,14 +158,14 @@ impl QueryExecutor {
 fn format_column_type(col: &Column) -> String {
     match col.column_type() {
         ColumnType::Null => "NULL".to_string(),
-        ColumnType::Bit => "BIT".to_string(),
+        ColumnType::Bit | ColumnType::Bitn => "BIT".to_string(),
         ColumnType::Int1 => "TINYINT".to_string(),
         ColumnType::Int2 => "SMALLINT".to_string(),
         ColumnType::Int4 => "INT".to_string(),
         ColumnType::Int8 => "BIGINT".to_string(),
         ColumnType::Float4 => "REAL".to_string(),
         ColumnType::Float8 => "FLOAT".to_string(),
-        ColumnType::Datetime => "DATETIME".to_string(),
+        ColumnType::Datetime | ColumnType::Datetimen => "DATETIME".to_string(),
         ColumnType::Datetime2 => "DATETIME2".to_string(),
         ColumnType::DatetimeOffsetn => "DATETIMEOFFSET".to_string(),
         ColumnType::Daten => "DATE".to_string(),
@@ -192,7 +192,7 @@ fn format_column_type(col: &Column) -> String {
 fn extract_cell_value(row: &Row, index: usize, col: &Column) -> CellValue {
     match col.column_type() {
         ColumnType::Null => CellValue::Null,
-        ColumnType::Bit => row
+        ColumnType::Bit | ColumnType::Bitn => row
             .get::<bool, _>(index)
             .map(CellValue::Bool)
             .unwrap_or(CellValue::Null),
@@ -228,7 +228,7 @@ fn extract_cell_value(row: &Row, index: usize, col: &Column) -> CellValue {
             .get::<f64, _>(index)
             .map(CellValue::Float)
             .unwrap_or(CellValue::Null),
-        ColumnType::Datetime | ColumnType::Datetime2 => row
+        ColumnType::Datetime | ColumnType::Datetime2 | ColumnType::Datetimen => row
             .get::<NaiveDateTime, _>(index)
             .map(|v| CellValue::DateTime(v.format("%Y-%m-%d %H:%M:%S").to_string()))
             .unwrap_or(CellValue::Null),
@@ -239,6 +239,10 @@ fn extract_cell_value(row: &Row, index: usize, col: &Column) -> CellValue {
         ColumnType::Timen => row
             .get::<NaiveTime, _>(index)
             .map(|v| CellValue::DateTime(v.format("%H:%M:%S").to_string()))
+            .unwrap_or(CellValue::Null),
+        ColumnType::DatetimeOffsetn => row
+            .get::<DateTime<FixedOffset>, _>(index)
+            .map(|v| CellValue::DateTime(v.format("%Y-%m-%d %H:%M:%S %:z").to_string()))
             .unwrap_or(CellValue::Null),
         ColumnType::BigVarChar
         | ColumnType::BigChar

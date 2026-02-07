@@ -427,7 +427,6 @@ impl App {
                             self.result = query_result;
                             self.results_scroll = 0;
                             self.results_selected = 0;
-                            self.active_panel = ActivePanel::Results;
                         }
                         Err(error_msg) => {
                             self.error = Some(error_msg);

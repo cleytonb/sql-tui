@@ -700,6 +700,13 @@ impl App {
                     self.schema_selected += 1;
                 }
             }
+            // Fetch source, clear query and fill query with source
+            KeyCode::Char('s') => {
+                let visible = self.get_visible_schema_nodes();
+                if let Some((_, node)) = visible.get(self.schema_selected) {
+                    self.fetch_source(node.name.clone());
+                }
+            }
             KeyCode::Enter | KeyCode::Char(' ') => {
                 let visible = self.get_visible_schema_nodes();
                 if let Some((_, node)) = visible.get(self.schema_selected) {
@@ -726,6 +733,11 @@ impl App {
             _ => {}
         }
         Ok(())
+    }
+
+    /// Fetch source code for a schema object
+    fn fetch_source(&mut self, object_name: String) {
+        
     }
 
     /// History panel
