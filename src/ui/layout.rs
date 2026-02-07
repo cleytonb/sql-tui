@@ -1,6 +1,6 @@
 //! Layout management
 
-use crate::app::{App, ActivePanel, SPINNER_FRAMES};
+use crate::app::{App, ActivePanel, SPINNER_FRAMES, InputMode};
 use crate::ui::{DefaultTheme, draw_query_editor, draw_results_table, draw_schema_explorer, draw_history_panel};
 use ratatui::prelude::*;
 use ratatui::widgets::{Block, Borders, Paragraph, Clear};
@@ -134,7 +134,6 @@ fn draw_status_bar(f: &mut Frame, app: &App, area: Rect) {
         .constraints([
             Constraint::Min(20),      // Messages
             Constraint::Length(50),   // Status info
-            Constraint::Length(40),   // Keyboard hints
         ])
         .split(area);
 
@@ -172,13 +171,6 @@ fn draw_status_bar(f: &mut Frame, app: &App, area: Rect) {
         .style(DefaultTheme::status_bar())
         .alignment(Alignment::Center);
     f.render_widget(status, chunks[1]);
-
-    // Simplified keyboard hints
-    let hints = "Enter:Run  Shift+Enter:Newline  Ctrl+F:Format  Tab:Indent";
-    let hints_widget = Paragraph::new(hints)
-        .style(DefaultTheme::status_bar())
-        .alignment(Alignment::Right);
-    f.render_widget(hints_widget, chunks[2]);
 }
 
 /// Draw help popup

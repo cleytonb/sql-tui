@@ -1,6 +1,6 @@
 //! Event handlers for the application - SIMPLIFIED VERSION
 
-use crate::app::{App, ActivePanel, ResultsTab, SPINNER_FRAMES};
+use crate::app::{App, ActivePanel, ResultsTab, SPINNER_FRAMES, InputMode};
 use anyhow::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
 use ratatui::prelude::*;
@@ -89,9 +89,14 @@ impl App {
             return Ok(());
         }
 
-        // Ctrl+Tab or Backtab to switch panels (Tab inserts indent in query editor)
-        if key.code == KeyCode::Tab && key.modifiers.contains(KeyModifiers::CONTROL)
-           || key.code == KeyCode::BackTab {
+        // Esc no QueryEditor em modo Insert -> volta para Normal
+        if key.code == KeyCode::Esc && self.active_panel == ActivePanel::QueryEditor && self.input_mode == InputMode::Insert {
+            self.input_mode = InputMode::Normal;
+            return Ok(());
+        }
+
+        // Tab in non-query panels switches panels
+        if key.code == KeyCode::Tab && (self.active_panel != ActivePanel::QueryEditor || self.input_mode == InputMode::Normal) {
             self.active_panel = match self.active_panel {
                 ActivePanel::QueryEditor => ActivePanel::Results,
                 ActivePanel::Results => ActivePanel::SchemaExplorer,
@@ -101,14 +106,21 @@ impl App {
             return Ok(());
         }
 
-        // Tab in non-query panels switches panels
-        if key.code == KeyCode::Tab && self.active_panel != ActivePanel::QueryEditor {
-            self.active_panel = match self.active_panel {
-                ActivePanel::QueryEditor => ActivePanel::Results,
-                ActivePanel::Results => ActivePanel::SchemaExplorer,
-                ActivePanel::SchemaExplorer => ActivePanel::History,
-                ActivePanel::History => ActivePanel::QueryEditor,
-            };
+        // 'q' in Normal mode -> switch to QueryEditor
+        if key.code == KeyCode::Char('q') && self.input_mode == InputMode::Normal {
+            self.active_panel = ActivePanel::QueryEditor;
+            return Ok(());
+        }
+
+        // 'r' in Normal mode -> switch to Results
+        if key.code == KeyCode::Char('r') && self.input_mode == InputMode::Normal {
+            self.active_panel = ActivePanel::Results;
+            return Ok(());
+        }
+
+        // 's' in Normal mode -> switch to SchemaExplorer
+        if key.code == KeyCode::Char('s') && self.input_mode == InputMode::Normal {
+            self.active_panel = ActivePanel::SchemaExplorer;
             return Ok(());
         }
 
@@ -210,83 +222,262 @@ impl App {
 
     /// Query Editor - Type and press Enter to run!
     fn handle_query_editor(&mut self, key: KeyEvent) -> Result<()> {
+        // Comandos que funcionam em ambos os modos
         match key.code {
-            // // ENTER = RUN QUERY!
-            // KeyCode::Enter if key.modifiers.contains(KeyModifiers::SHIFT) => {
-            //     // Shift+Enter = new line
-            //     self.query.insert(self.cursor_pos, '\n');
-            //     self.cursor_pos += 1;
-            // }
-            // KeyCode::Enter => {
-            //     // Plain Enter = RUN QUERY!
-            //     self.start_query();
-            // }
-            KeyCode::Enter => {
-                // Shift+Enter = new line
-                self.query.insert(self.cursor_pos, '\n');
-                self.cursor_pos += 1;
-            }
-            // F5 also runs query
-            KeyCode::F(5) => {
+            // Ctrl+E = executar query (Run)
+            KeyCode::Char('e') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 self.start_query();
+                return Ok(());
             }
             // Ctrl+F = Format SQL
             KeyCode::Char('f') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 self.format_sql();
+                return Ok(());
             }
-            // Tab = insert 4 spaces for indentation
-            KeyCode::Tab => {
-                let indent = "    "; // 4 spaces
-                for c in indent.chars() {
+            _ => {}
+        }
+
+        // Modo Insert - digitação normal
+        if self.input_mode == InputMode::Insert {
+            match key.code {
+                KeyCode::Enter => {
+                    self.query.insert(self.cursor_pos, '\n');
+                    self.cursor_pos += 1;
+                }
+                // Tab = insert 4 spaces for indentation
+                KeyCode::Tab => {
+                    let indent = "    "; // 4 spaces
+                    for c in indent.chars() {
+                        self.query.insert(self.cursor_pos, c);
+                        self.cursor_pos += 1;
+                    }
+                }
+                // Typing
+                KeyCode::Char(c) => {
                     self.query.insert(self.cursor_pos, c);
                     self.cursor_pos += 1;
                 }
-            }
-            // Typing
-            KeyCode::Char(c) => {
-                self.query.insert(self.cursor_pos, c);
-                self.cursor_pos += 1;
-            }
-            // Backspace
-            KeyCode::Backspace => {
-                if self.cursor_pos > 0 {
-                    self.cursor_pos -= 1;
-                    self.query.remove(self.cursor_pos);
+                // Backspace
+                KeyCode::Backspace => {
+                    if self.cursor_pos > 0 {
+                        self.cursor_pos -= 1;
+                        self.query.remove(self.cursor_pos);
+                    }
                 }
-            }
-            // Delete
-            KeyCode::Delete => {
-                if self.cursor_pos < self.query.len() {
-                    self.query.remove(self.cursor_pos);
+                // Delete
+                KeyCode::Delete => {
+                    if self.cursor_pos < self.query.len() {
+                        self.query.remove(self.cursor_pos);
+                    }
                 }
+                // Arrow keys for cursor movement
+                KeyCode::Left => {
+                    self.cursor_pos = self.cursor_pos.saturating_sub(1);
+                }
+                KeyCode::Right => {
+                    self.cursor_pos = (self.cursor_pos + 1).min(self.query.len());
+                }
+                KeyCode::Up => {
+                    self.move_cursor_up();
+                }
+                KeyCode::Down => {
+                    self.move_cursor_down();
+                }
+                KeyCode::Home => {
+                    // Ir para início da linha atual
+                    let text_before: String = self.query.chars().take(self.cursor_pos).collect();
+                    if let Some(last_newline) = text_before.rfind('\n') {
+                        self.cursor_pos = last_newline + 1;
+                    } else {
+                        self.cursor_pos = 0;
+                    }
+                }
+                KeyCode::End => {
+                    // Ir para fim da linha atual
+                    let text_after: String = self.query.chars().skip(self.cursor_pos).collect();
+                    if let Some(next_newline) = text_after.find('\n') {
+                        self.cursor_pos += next_newline;
+                    } else {
+                        self.cursor_pos = self.query.len();
+                    }
+                }
+                _ => {}
             }
-            // Arrow keys for cursor movement
-            KeyCode::Left => {
-                self.cursor_pos = self.cursor_pos.saturating_sub(1);
+        } else {
+            // Modo Normal - comandos vim
+            match key.code {
+                // Movimento
+                KeyCode::Char('h') | KeyCode::Left => {
+                    self.cursor_pos = self.cursor_pos.saturating_sub(1);
+                }
+                KeyCode::Char('l') | KeyCode::Right => {
+                    self.cursor_pos = (self.cursor_pos + 1).min(self.query.len().saturating_sub(1));
+                }
+                KeyCode::Char('k') | KeyCode::Up => {
+                    self.move_cursor_up();
+                }
+                KeyCode::Char('j') | KeyCode::Down => {
+                    self.move_cursor_down();
+                }
+                // Início/fim da linha
+                KeyCode::Char('0') | KeyCode::Home => {
+                    let text_before: String = self.query.chars().take(self.cursor_pos).collect();
+                    if let Some(last_newline) = text_before.rfind('\n') {
+                        self.cursor_pos = last_newline + 1;
+                    } else {
+                        self.cursor_pos = 0;
+                    }
+                }
+                KeyCode::Char('$') | KeyCode::End => {
+                    let text_after: String = self.query.chars().skip(self.cursor_pos).collect();
+                    if let Some(next_newline) = text_after.find('\n') {
+                        self.cursor_pos += next_newline;
+                    } else {
+                        self.cursor_pos = self.query.len();
+                    }
+                }
+                // Primeiro caractere não-branco da linha
+                KeyCode::Char('^') => {
+                    let text_before: String = self.query.chars().take(self.cursor_pos).collect();
+                    let line_start = if let Some(last_newline) = text_before.rfind('\n') {
+                        last_newline + 1
+                    } else {
+                        0
+                    };
+                    let line: String = self.query.chars().skip(line_start).collect();
+                    let first_non_white = line.find(|c: char| !c.is_whitespace() || c == '\n')
+                        .unwrap_or(0);
+                    self.cursor_pos = line_start + first_non_white;
+                }
+                // Palavra seguinte
+                KeyCode::Char('w') => {
+                    let chars: Vec<char> = self.query.chars().collect();
+                    let mut pos = self.cursor_pos;
+                    // Pular caracteres da palavra atual
+                    while pos < chars.len() && chars[pos].is_alphanumeric() {
+                        pos += 1;
+                    }
+                    // Pular espaços
+                    while pos < chars.len() && chars[pos].is_whitespace() && chars[pos] != '\n' {
+                        pos += 1;
+                    }
+                    self.cursor_pos = pos.min(chars.len().saturating_sub(1));
+                }
+                // Palavra anterior
+                KeyCode::Char('b') => {
+                    let chars: Vec<char> = self.query.chars().collect();
+                    let mut pos = self.cursor_pos.saturating_sub(1);
+                    // Pular espaços
+                    while pos > 0 && chars[pos].is_whitespace() {
+                        pos -= 1;
+                    }
+                    // Pular caracteres da palavra
+                    while pos > 0 && chars[pos - 1].is_alphanumeric() {
+                        pos -= 1;
+                    }
+                    self.cursor_pos = pos;
+                }
+                // Início/fim do documento
+                KeyCode::Char('g') => {
+                    self.cursor_pos = 0;
+                }
+                KeyCode::Char('G') => {
+                    self.cursor_pos = self.query.len().saturating_sub(1);
+                }
+                // Deletar caractere
+                KeyCode::Char('x') => {
+                    if self.cursor_pos < self.query.len() {
+                        self.query.remove(self.cursor_pos);
+                        if self.cursor_pos >= self.query.len() && self.cursor_pos > 0 {
+                            self.cursor_pos -= 1;
+                        }
+                    }
+                }
+                // Deletar linha inteira
+                KeyCode::Char('d') => {
+                    // dd - deleta linha (simplificado: só 'd' deleta a linha)
+                    let text_before: String = self.query.chars().take(self.cursor_pos).collect();
+                    let line_start = if let Some(last_newline) = text_before.rfind('\n') {
+                        last_newline + 1
+                    } else {
+                        0
+                    };
+                    let text_after: String = self.query.chars().skip(self.cursor_pos).collect();
+                    let line_end = if let Some(next_newline) = text_after.find('\n') {
+                        self.cursor_pos + next_newline + 1
+                    } else {
+                        self.query.len()
+                    };
+                    self.query.drain(line_start..line_end);
+                    self.cursor_pos = line_start.min(self.query.len().saturating_sub(1));
+                }
+                // Append (inserir após cursor)
+                KeyCode::Char('a') => {
+                    if self.cursor_pos < self.query.len() {
+                        self.cursor_pos += 1;
+                    }
+                    self.input_mode = InputMode::Insert;
+                }
+                // Append no fim da linha
+                KeyCode::Char('A') => {
+                    let text_after: String = self.query.chars().skip(self.cursor_pos).collect();
+                    if let Some(next_newline) = text_after.find('\n') {
+                        self.cursor_pos += next_newline;
+                    } else {
+                        self.cursor_pos = self.query.len();
+                    }
+                    self.input_mode = InputMode::Insert;
+                }
+                // Insert no início da linha
+                KeyCode::Char('I') => {
+                    let text_before: String = self.query.chars().take(self.cursor_pos).collect();
+                    if let Some(last_newline) = text_before.rfind('\n') {
+                        self.cursor_pos = last_newline + 1;
+                    } else {
+                        self.cursor_pos = 0;
+                    }
+                    self.input_mode = InputMode::Insert;
+                }
+                // Nova linha abaixo
+                KeyCode::Char('o') => {
+                    let text_after: String = self.query.chars().skip(self.cursor_pos).collect();
+                    let line_end = if let Some(next_newline) = text_after.find('\n') {
+                        self.cursor_pos + next_newline
+                    } else {
+                        self.query.len()
+                    };
+                    self.query.insert(line_end, '\n');
+                    self.cursor_pos = line_end + 1;
+                    self.input_mode = InputMode::Insert;
+                }
+                // Nova linha acima
+                KeyCode::Char('O') => {
+                    let text_before: String = self.query.chars().take(self.cursor_pos).collect();
+                    let line_start = if let Some(last_newline) = text_before.rfind('\n') {
+                        last_newline + 1
+                    } else {
+                        0
+                    };
+                    self.query.insert(line_start, '\n');
+                    self.cursor_pos = line_start;
+                    self.input_mode = InputMode::Insert;
+                }
+                // Change
+                KeyCode::Char('c') => {
+                    if self.cursor_pos < self.query.len() {
+                        self.query.remove(self.cursor_pos);
+                        if self.cursor_pos >= self.query.len() && self.cursor_pos > 0 {
+                            self.cursor_pos -= 1;
+                        }
+                        self.input_mode = InputMode::Insert;
+                    }
+                }
+                // Insert mode (na posição atual)
+                KeyCode::Char('i') => {
+                    self.input_mode = InputMode::Insert;
+                }
+                _ => {}
             }
-            KeyCode::Right => {
-                self.cursor_pos = (self.cursor_pos + 1).min(self.query.len());
-            }
-            KeyCode::Up => {
-                // Move cursor up one line
-                self.move_cursor_up();
-            }
-            KeyCode::Down => {
-                // Move cursor down one line
-                self.move_cursor_down();
-            }
-            KeyCode::Home => {
-                self.cursor_pos = 0;
-            }
-            KeyCode::End => {
-                self.cursor_pos = self.query.len();
-            }
-            // Esc clears query
-            KeyCode::Esc => {
-                self.query.clear();
-                self.cursor_pos = 0;
-            }
-            _ => {}
         }
         Ok(())
     }

@@ -1,6 +1,6 @@
 //! UI widgets for the application
 
-use crate::app::{App, SchemaNodeType, ResultsTab};
+use crate::app::{App, SchemaNodeType, ResultsTab, InputMode};
 use crate::db::CellValue;
 use crate::ui::DefaultTheme;
 use ratatui::prelude::*;
@@ -18,7 +18,8 @@ pub fn draw_query_editor(f: &mut Frame, app: &mut App, area: Rect, active: bool)
         DefaultTheme::inactive_border()
     };
 
-    let title = if active { " Query [1] ▪ " } else { " Query [1] " };
+    // Title with active and input mode indicator
+    let title = format!(" Query [q] {} {} ", if active { "▪" } else { "" }, if app.input_mode == InputMode::Insert { "[INSERT]" } else { "" });
 
     // Create outer block
     let block = Block::default()
@@ -641,7 +642,7 @@ pub fn draw_schema_explorer(f: &mut Frame, app: &App, area: Rect, active: bool) 
         DefaultTheme::inactive_border()
     };
 
-    let title = if active { " Schema [3] ▪ " } else { " Schema [3] " };
+    let title = if active { " Schema [s] ▪ " } else { " Schema [s] " };
 
     let visible_nodes = app.get_visible_schema_nodes();
 
