@@ -335,7 +335,7 @@ impl App {
                 }
                 _ => {}
             }
-        } else {
+        } else if self.input_mode == InputMode::Normal {
             // Modo Normal - comandos vim
             match key.code {
                 // Movimento
@@ -522,7 +522,111 @@ impl App {
                 }
                 // Visual mode (na posição atual)
                 KeyCode::Char('v') => {
+                    self.visual_anchor = self.cursor_pos;
                     self.input_mode = InputMode::Visual;
+                }
+                _ => {}
+            }
+        } else if self.input_mode == InputMode::Visual {
+            // Modo Visual - seleção de texto
+            match key.code {
+                // Esc ou v para sair do modo visual
+                KeyCode::Esc | KeyCode::Char('v') => {
+                    self.input_mode = InputMode::Normal;
+                }
+                // Movimento - expande/contrai a seleção
+                KeyCode::Char('h') | KeyCode::Left => {
+                    self.cursor_pos = self.cursor_pos.saturating_sub(1);
+                }
+                KeyCode::Char('l') | KeyCode::Right => {
+                    self.cursor_pos = (self.cursor_pos + 1).min(self.query.len().saturating_sub(1));
+                }
+                KeyCode::Char('k') | KeyCode::Up => {
+                    self.move_cursor_up();
+                }
+                KeyCode::Char('j') | KeyCode::Down => {
+                    self.move_cursor_down();
+                }
+                // Início/fim da linha
+                KeyCode::Char('0') | KeyCode::Home => {
+                    let text_before: String = self.query.chars().take(self.cursor_pos).collect();
+                    if let Some(last_newline) = text_before.rfind('\n') {
+                        self.cursor_pos = last_newline + 1;
+                    } else {
+                        self.cursor_pos = 0;
+                    }
+                }
+                KeyCode::Char('$') | KeyCode::End => {
+                    let text_after: String = self.query.chars().skip(self.cursor_pos).collect();
+                    if let Some(next_newline) = text_after.find('\n') {
+                        self.cursor_pos += next_newline;
+                    } else {
+                        self.cursor_pos = self.query.len().saturating_sub(1);
+                    }
+                }
+                // Palavra seguinte
+                KeyCode::Char('w') => {
+                    let chars: Vec<char> = self.query.chars().collect();
+                    let mut pos = self.cursor_pos;
+                    while pos < chars.len() && chars[pos].is_alphanumeric() {
+                        pos += 1;
+                    }
+                    while pos < chars.len() && chars[pos].is_whitespace() && chars[pos] != '\n' {
+                        pos += 1;
+                    }
+                    self.cursor_pos = pos.min(chars.len().saturating_sub(1));
+                }
+                // Palavra anterior
+                KeyCode::Char('b') => {
+                    let chars: Vec<char> = self.query.chars().collect();
+                    let mut pos = self.cursor_pos.saturating_sub(1);
+                    while pos > 0 && chars[pos].is_whitespace() {
+                        pos -= 1;
+                    }
+                    while pos > 0 && chars[pos - 1].is_alphanumeric() {
+                        pos -= 1;
+                    }
+                    self.cursor_pos = pos;
+                }
+                // Início/fim do documento
+                KeyCode::Char('g') => {
+                    self.cursor_pos = 0;
+                }
+                KeyCode::Char('G') => {
+                    self.cursor_pos = self.query.len().saturating_sub(1);
+                }
+                // Yank (copiar) seleção
+                KeyCode::Char('y') => {
+                    if let Some(text) = self.yank_selection() {
+                        if let Ok(mut clipboard) = arboard::Clipboard::new() {
+                            let _ = clipboard.set_text(&text);
+                            self.message = Some(format!("Yanked {} chars", text.len()));
+                        }
+                    }
+                }
+                // Delete seleção
+                KeyCode::Char('d') | KeyCode::Char('x') => {
+                    // Primeiro copia para clipboard, depois deleta
+                    let text = self.get_selected_text();
+                    if let Ok(mut clipboard) = arboard::Clipboard::new() {
+                        let _ = clipboard.set_text(&text);
+                    }
+                    self.delete_selection();
+                    self.message = Some(format!("Deleted {} chars", text.len()));
+                }
+                // Change (deletar e entrar no modo Insert)
+                KeyCode::Char('c') => {
+                    let text = self.get_selected_text();
+                    if let Ok(mut clipboard) = arboard::Clipboard::new() {
+                        let _ = clipboard.set_text(&text);
+                    }
+                    self.delete_selection();
+                    self.input_mode = InputMode::Insert;
+                }
+                // Selecionar tudo (ggVG simulado)
+                KeyCode::Char('a') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                    self.visual_anchor = 0;
+                    self.cursor_pos = self.query.len().saturating_sub(1);
                 }
                 _ => {}
             }
@@ -627,7 +731,7 @@ impl App {
     /// Export results to CSV file
     fn export_results_csv(&mut self) {
         if self.result.rows.is_empty() {
-            self.error = Some("No results to export".to_string());
+            self.error = Some("Nenhum resultado para exportar".to_string());
             return;
         }
 
@@ -636,10 +740,10 @@ impl App {
 
         match self.export_csv(&filename) {
             Ok(()) => {
-                self.message = Some(format!("✓ Exported {} rows to {}", self.result.rows.len(), filename));
+                self.message = Some(format!("✓ Exportado {} linhas para {}", self.result.rows.len(), filename));
             }
             Err(e) => {
-                self.error = Some(format!("Export failed: {}", e));
+                self.error = Some(format!("Falha na exportação: {}", e));
             }
         }
     }
@@ -647,7 +751,7 @@ impl App {
     /// Export results to JSON file
     fn export_results_json(&mut self) {
         if self.result.rows.is_empty() {
-            self.error = Some("No results to export".to_string());
+            self.error = Some("Nenhum resultado para exportar".to_string());
             return;
         }
 
@@ -656,10 +760,10 @@ impl App {
 
         match self.export_json(&filename) {
             Ok(()) => {
-                self.message = Some(format!("✓ Exported {} rows to {}", self.result.rows.len(), filename));
+                self.message = Some(format!("✓ Exportado {} linhas para {}", self.result.rows.len(), filename));
             }
             Err(e) => {
-                self.error = Some(format!("Export failed: {}", e));
+                self.error = Some(format!("Falha na exportação: {}", e));
             }
         }
     }
@@ -697,7 +801,7 @@ impl App {
 
             if let Ok(mut clipboard) = arboard::Clipboard::new() {
                 let _ = clipboard.set_text(&insert);
-                self.message = Some("✓ Copied INSERT statement to clipboard".to_string());
+                self.message = Some("✓ Copiado INSERT statement para clipboard".to_string());
             }
         }
     }
@@ -851,7 +955,7 @@ impl App {
                 let text = cell.to_string();
                 if let Ok(mut clipboard) = arboard::Clipboard::new() {
                     let _ = clipboard.set_text(&text);
-                    self.message = Some(format!("Copied: {}", text));
+                    self.message = Some(format!("Copiado: {}", text));
                 }
             }
         }

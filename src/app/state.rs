@@ -174,6 +174,9 @@ pub struct App {
 
     /// Pending smooth scroll amount (positive = down, negative = up)
     pub pending_scroll: i32,
+
+    /// Visual mode selection anchor (start position)
+    pub visual_anchor: usize,
 }
 
 /// Spinner animation frames
@@ -199,7 +202,7 @@ impl App {
             result: QueryResult::empty(),
             is_loading: false,
             error: None,
-            message: Some("Connected to SQL Server".to_string()),
+            message: Some("Conectado ao SQL Server".to_string()),
             active_panel: ActivePanel::QueryEditor,
             input_mode: InputMode::Insert,
             history: QueryHistory::new(1000),
@@ -215,7 +218,7 @@ impl App {
             command_buffer: String::new(),
             should_quit: false,
             show_help: false,
-            status: format!("Connected | {}", short_version),
+            status: format!("Conectado | {}", short_version),
             server_version: short_version,
             spinner_frame: 0,
             pending_query: None,
@@ -225,6 +228,7 @@ impl App {
             show_search_schema: false,
             schema_search_query: String::new(),
             pending_scroll: 0,
+            visual_anchor: 0,
         };
 
         // Load initial schema
@@ -258,7 +262,7 @@ impl App {
                 );
 
                 self.message = Some(format!(
-                    "{} row(s) returned in {:.2}ms",
+                    "{} linha(s) retornada(s) em {:.2}ms",
                     row_count,
                     result.execution_time.as_secs_f64() * 1000.0
                 ));
@@ -368,7 +372,13 @@ impl App {
 
     /// Start query execution (non-blocking)
     pub fn start_query(&mut self) {
-        if self.query.trim().is_empty() || self.is_loading {
+        let query_text = if self.input_mode == InputMode::Visual {
+            self.get_selected_text()
+        } else {
+            self.query.clone()
+        };
+
+        if query_text.trim().is_empty() || self.is_loading {
             return;
         }
 
@@ -379,15 +389,14 @@ impl App {
 
         let (tx, rx) = oneshot::channel();
         let client_arc = self.db.client();
-        let query = self.query.clone();
 
         self.pending_query = Some(rx);
-        self.pending_query_text = Some(query.clone());
+        self.pending_query_text = Some(query_text.clone());
 
         // Spawn query execution in background
         tokio::spawn(async move {
             let mut client = client_arc.lock().await;
-            let result = crate::db::QueryExecutor::execute(&mut client, &query).await;
+            let result = crate::db::QueryExecutor::execute(&mut client, &query_text).await;
 
             let _ = tx.send(match result {
                 Ok(r) => Ok(r),
@@ -424,7 +433,7 @@ impl App {
                             }
 
                             self.message = Some(format!(
-                                "{} row(s) returned in {:.2}ms",
+                                "{} linha(s) retornada(s) em {:.2}ms",
                                 row_count,
                                 query_result.execution_time.as_secs_f64() * 1000.0
                             ));
@@ -447,7 +456,7 @@ impl App {
                 }
                 Err(oneshot::error::TryRecvError::Closed) => {
                     // Channel closed unexpectedly
-                    self.error = Some("Query execution was interrupted".to_string());
+                    self.error = Some("Execução da query interrompida".to_string());
                     self.is_loading = false;
                     self.pending_query = None;
                     self.pending_query_text = None;
@@ -639,6 +648,38 @@ impl App {
         self.cursor_pos = self.query.len();
         self.query_scroll_x = 0;
         self.query_scroll_y = 0;
+    }
+
+    /// Get visual selection range (start, end) - always start <= end
+    pub fn get_visual_selection(&self) -> (usize, usize) {
+        if self.visual_anchor <= self.cursor_pos {
+            (self.visual_anchor, self.cursor_pos)
+        } else {
+            (self.cursor_pos, self.visual_anchor)
+        }
+    }
+
+    /// Get selected text in visual mode
+    pub fn get_selected_text(&self) -> String {
+        let (start, end) = self.get_visual_selection();
+        self.query.chars().skip(start).take(end - start + 1).collect()
+    }
+
+    /// Delete selected text in visual mode
+    pub fn delete_selection(&mut self) {
+        let (start, end) = self.get_visual_selection();
+        // Remove characters from start to end (inclusive)
+        let end_inclusive = (end + 1).min(self.query.len());
+        self.query.drain(start..end_inclusive);
+        self.cursor_pos = start.min(self.query.len().saturating_sub(1));
+        self.input_mode = InputMode::Normal;
+    }
+
+    /// Yank (copy) selected text to clipboard
+    pub fn yank_selection(&mut self) -> Option<String> {
+        let text = self.get_selected_text();
+        self.input_mode = InputMode::Normal;
+        Some(text)
     }
 }
 

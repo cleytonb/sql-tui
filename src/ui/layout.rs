@@ -56,12 +56,13 @@ fn draw_header(f: &mut Frame, app: &App, area: Rect) {
     .style(DefaultTheme::header());
     f.render_widget(logo, header_chunks[0]);
 
-    // Connection info
+    // Connection info (app.db.config.database tem que ter replace de Evermart para Checkout)
+    let database = app.db.config.database.replace("Evermart", "Checkout");
     let conn_info = Paragraph::new(vec![
         Line::from(""),
         Line::from(vec![
             Span::styled("● ", DefaultTheme::success()),
-            Span::styled(&app.db.config.database, DefaultTheme::normal_text()),
+            Span::styled(&database, DefaultTheme::normal_text()),
             Span::styled(" @ ", DefaultTheme::dim_text()),
             Span::styled(&app.db.config.host, DefaultTheme::dim_text()),
         ]),
@@ -74,10 +75,10 @@ fn draw_header(f: &mut Frame, app: &App, area: Rect) {
     let hints = Paragraph::new(vec![
         Line::from(""),
         Line::from(vec![
-            Span::styled("Enter", DefaultTheme::info()),
-            Span::styled(":Run ", DefaultTheme::dim_text()),
+            Span::styled("Ctrl+E", DefaultTheme::info()),
+            Span::styled(":Executar ", DefaultTheme::dim_text()),
             Span::styled("F1", DefaultTheme::info()),
-            Span::styled(":Help ", DefaultTheme::dim_text()),
+            Span::styled(":Ajuda ", DefaultTheme::dim_text()),
         ]),
         Line::from(""),
     ])
@@ -133,7 +134,7 @@ fn draw_status_bar(f: &mut Frame, app: &App, area: Rect) {
         .direction(Direction::Horizontal)
         .constraints([
             Constraint::Min(20),      // Messages
-            Constraint::Length(50),   // Status info
+            Constraint::Length(76),   // Status info
         ])
         .split(area);
 
@@ -151,21 +152,19 @@ fn draw_status_bar(f: &mut Frame, app: &App, area: Rect) {
     } else if app.is_loading {
         let spinner = SPINNER_FRAMES[app.spinner_frame];
         Paragraph::new(Span::styled(
-            format!("{} Executing query...", spinner),
+            format!("{} Executando query...", spinner),
             DefaultTheme::warning(),
         ))
     } else {
-        Paragraph::new(Span::styled("Type query, press Enter to run", DefaultTheme::dim_text()))
+        Paragraph::new(Span::styled("Monte a query, CTRL+E para executar", DefaultTheme::dim_text()))
     };
 
     f.render_widget(message.style(DefaultTheme::status_bar()), chunks[0]);
 
     // Status info
     let status_info = format!(
-        " {} | Rows: {} | History: {} ",
-        app.status,
-        app.result.row_count,
-        app.history.len()
+        " {} ",
+        app.status
     );
     let status = Paragraph::new(status_info)
         .style(DefaultTheme::status_bar())
@@ -175,46 +174,20 @@ fn draw_status_bar(f: &mut Frame, app: &App, area: Rect) {
 
 /// Draw help popup
 pub fn draw_help_popup(f: &mut Frame, area: Rect) {
-    let popup_area = centered_rect(60, 60, area);
+    let popup_area = centered_rect(30, 30, area);
 
     // Clear the area
     f.render_widget(Clear, popup_area);
 
     let help_text = vec![
-        Line::from(Span::styled("🏦 ALRAJHI SQL STUDIO - KEYBOARD SHORTCUTS", DefaultTheme::title())),
+        Line::from(Span::styled("🏦 CRYPTONICS SQL STUDIO - AJUDA", DefaultTheme::title())),
         Line::from(""),
-        Line::from(Span::styled("═══ QUERY EDITOR ═══", DefaultTheme::info())),
-        Line::from("  Enter           Run query"),
-        Line::from("  Shift+Enter     New line in query"),
-        Line::from("  Tab             Insert indentation (4 spaces)"),
-        Line::from("  Ctrl+F          Format SQL (beautify)"),
-        Line::from("  F5              Run query"),
-        Line::from("  Esc             Clear query"),
-        Line::from("  ←/→/↑/↓         Move cursor"),
-        Line::from("  Home/End        Jump to start/end"),
+        Line::from(Span::styled("═══ REGRA ÚNICA ═══", DefaultTheme::info())),
         Line::from(""),
-        Line::from(Span::styled("═══ RESULTS TABLE ═══", DefaultTheme::info())),
-        Line::from("  ↑/↓ or j/k      Navigate rows"),
-        Line::from("  ←/→ or h/l      Navigate columns"),
-        Line::from("  PageUp/Down     Fast scroll (20 rows)"),
-        Line::from("  Home/End        First/Last row"),
-        Line::from("  Ctrl+Y          Copy cell value"),
-        Line::from("  Ctrl+E          Export to CSV"),
-        Line::from("  Ctrl+S          Export to JSON"),
-        Line::from("  Ctrl+I          Copy row as INSERT"),
-        Line::from("  Enter/Esc       Back to query"),
+        Line::from("Vencedores não precisam de ajuda"),
         Line::from(""),
-        Line::from(Span::styled("═══ PANELS ═══", DefaultTheme::info())),
-        Line::from("  Ctrl+Tab        Next panel"),
-        Line::from("  Shift+Tab       Previous panel"),
-        Line::from("  Schema: Enter   Expand/Insert table"),
-        Line::from("  History: Enter  Load query"),
         Line::from(""),
-        Line::from(Span::styled("═══ GLOBAL ═══", DefaultTheme::info())),
-        Line::from("  Ctrl+Q          Quit application"),
-        Line::from("  F1              Toggle this help"),
-        Line::from(""),
-        Line::from(Span::styled("Press Esc or F1 to close", DefaultTheme::dim_text())),
+        Line::from("\"Mais um dia para provar que o rock não morreu - Mel\"")
     ];
 
     let help = Paragraph::new(help_text)
@@ -222,7 +195,7 @@ pub fn draw_help_popup(f: &mut Frame, area: Rect) {
             Block::default()
                 .borders(Borders::ALL)
                 .border_style(DefaultTheme::popup_border())
-                .title(Span::styled(" Help ", DefaultTheme::title()))
+                .title(Span::styled(" Ajuda ", DefaultTheme::title()))
                 .style(DefaultTheme::popup()),
         )
         .wrap(ratatui::widgets::Wrap { trim: false });

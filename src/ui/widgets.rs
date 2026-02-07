@@ -19,7 +19,13 @@ pub fn draw_query_editor(f: &mut Frame, app: &mut App, area: Rect, active: bool)
     };
 
     // Title with active and input mode indicator
-    let title = format!(" Query [q] {} {} ", if active { "▪" } else { "" }, if app.input_mode == InputMode::Insert { "[INSERT]" } else { "" });
+    let mode_indicator = match app.input_mode {
+        InputMode::Insert => "[INSERT]",
+        InputMode::Visual => "[VISUAL]",
+        InputMode::Normal => "",
+        InputMode::Command => "[COMMAND]",
+    };
+    let title = format!(" Query [q] {} {} ", if active { "▪" } else { "" }, mode_indicator);
 
     // Create outer block
     let block = Block::default()
@@ -75,6 +81,13 @@ pub fn draw_query_editor(f: &mut Frame, app: &mut App, area: Rect, active: bool)
         let line_num_widget = Paragraph::new(line_numbers);
         f.render_widget(line_num_widget, line_num_area);
 
+        // Get visual selection if in visual mode
+        let visual_selection = if app.input_mode == InputMode::Visual {
+            Some(app.get_visual_selection())
+        } else {
+            None
+        };
+
         // Draw syntax-highlighted code with scrolling
         let highlighted_lines = highlight_sql_with_scroll(
             &app.query,
@@ -82,6 +95,7 @@ pub fn draw_query_editor(f: &mut Frame, app: &mut App, area: Rect, active: bool)
             app.query_scroll_y,
             visible_width,
             visible_height,
+            visual_selection,
         );
         let code_widget = Paragraph::new(highlighted_lines);
         f.render_widget(code_widget, code_area);
@@ -156,9 +170,9 @@ pub fn draw_results_table(f: &mut Frame, app: &mut App, area: Rect, active: bool
 /// Draw the tabs bar
 fn draw_results_tabs(f: &mut Frame, app: &App, area: Rect, active: bool) {
     let tabs = vec![
-        ("1:Data", ResultsTab::Data),
-        ("2:Columns", ResultsTab::Columns),
-        ("3:Stats", ResultsTab::Stats),
+        ("1:Dados", ResultsTab::Data),
+        ("2:Colunas", ResultsTab::Columns),
+        ("3:Estatísticas", ResultsTab::Stats),
     ];
 
     let mut spans: Vec<Span> = vec![Span::raw(" ")];
@@ -180,7 +194,7 @@ fn draw_results_tabs(f: &mut Frame, app: &App, area: Rect, active: bool) {
     // Add row/col info on the right
     if !app.result.columns.is_empty() {
         let info = format!(
-            "│ {} rows × {} cols ",
+            "│ {} linhas × {} colunas ",
             app.result.row_count,
             app.result.columns.len()
         );
@@ -204,7 +218,7 @@ fn draw_results_data(f: &mut Frame, app: &mut App, area: Rect, active: bool) {
     // Build title with stats
     let exec_time_ms = app.result.execution_time.as_secs_f64() * 1000.0;
     let title = format!(
-        " Data │ {} rows │ {} cols │ {:.1}ms ",
+        " Dados │ {} linhas │ {} colunas │ {:.1}ms ",
         app.result.row_count,
         app.result.columns.len(),
         exec_time_ms
@@ -361,7 +375,7 @@ fn draw_results_data(f: &mut Frame, app: &mut App, area: Rect, active: bool) {
     // Draw position indicator at bottom right
     if !app.result.rows.is_empty() {
         let pos_text = format!(
-            " Row {}/{} Col {}/{} ",
+            " Linha {}/{} Coluna {}/{} ",
             app.results_selected + 1,
             app.result.rows.len(),
             app.results_col_selected + 1,
@@ -389,7 +403,7 @@ fn draw_results_columns(f: &mut Frame, app: &App, area: Rect, active: bool) {
         DefaultTheme::inactive_border()
     };
 
-    let title = format!(" Columns │ {} total ", app.result.columns.len());
+    let title = format!(" Colunas │ {} total ", app.result.columns.len());
 
     // Create column info rows - use results_selected for vertical scrolling
     let visible_height = area.height.saturating_sub(3) as usize;
@@ -435,8 +449,8 @@ fn draw_results_columns(f: &mut Frame, app: &App, area: Rect, active: bool) {
     let header = Row::new(vec![
         Cell::from(" # ").style(DefaultTheme::table_header()),
         Cell::from(" ").style(DefaultTheme::table_header()),
-        Cell::from(" Column Name ").style(DefaultTheme::table_header()),
-        Cell::from(" Data Type ").style(DefaultTheme::table_header()),
+        Cell::from(" Nome da Coluna ").style(DefaultTheme::table_header()),
+        Cell::from(" Tipo de Dados ").style(DefaultTheme::table_header()),
     ])
     .height(1);
 
@@ -507,30 +521,30 @@ fn draw_results_stats(f: &mut Frame, app: &App, area: Rect, active: bool) {
     // Build stats text
     let mut stats_lines: Vec<Line> = vec![
         Line::from(""),
-        Line::from(Span::styled("═══ QUERY STATISTICS ═══", DefaultTheme::info())),
+        Line::from(Span::styled("═══ ESTATÍSTICAS DA QUERY ═══", DefaultTheme::info())),
         Line::from(""),
         Line::from(vec![
-            Span::styled("  Execution Time:  ", DefaultTheme::dim_text()),
+            Span::styled("  Tempo de Execução:  ", DefaultTheme::dim_text()),
             Span::styled(format!("{:.2} ms", exec_ms), DefaultTheme::success()),
         ]),
         Line::from(vec![
-            Span::styled("  Rows Returned:   ", DefaultTheme::dim_text()),
+            Span::styled("  Linhas Retornadas:   ", DefaultTheme::dim_text()),
             Span::styled(format_number(app.result.row_count as i64), DefaultTheme::info()),
         ]),
         Line::from(vec![
-            Span::styled("  Columns:         ", DefaultTheme::dim_text()),
+            Span::styled("  Colunas:         ", DefaultTheme::dim_text()),
             Span::styled(format!("{}", app.result.columns.len()), DefaultTheme::info()),
         ]),
         Line::from(vec![
-            Span::styled("  Total Cells:     ", DefaultTheme::dim_text()),
+            Span::styled("  Total de Células:     ", DefaultTheme::dim_text()),
             Span::styled(format_number(total_cells as i64), DefaultTheme::normal_text()),
         ]),
         Line::from(vec![
-            Span::styled("  NULL Values:     ", DefaultTheme::dim_text()),
+            Span::styled("  Valores NULL:     ", DefaultTheme::dim_text()),
             Span::styled(format!("{} ({:.1}%)", format_number(null_count as i64), null_percentage), DefaultTheme::warning()),
         ]),
         Line::from(""),
-        Line::from(Span::styled("═══ DATA TYPES ═══", DefaultTheme::info())),
+        Line::from(Span::styled("═══ TIPOS DE DADOS ═══", DefaultTheme::info())),
         Line::from(""),
     ];
 
@@ -543,28 +557,28 @@ fn draw_results_stats(f: &mut Frame, app: &App, area: Rect, active: bool) {
         stats_lines.push(Line::from(vec![
             Span::styled(format!("  {} ", indicator), DefaultTheme::normal_text()),
             Span::styled(format!("{:<20}", type_name), DefaultTheme::dim_text()),
-            Span::styled(format!("{:>5} column(s)", count), DefaultTheme::normal_text()),
+            Span::styled(format!("{:>5} coluna(s)", count), DefaultTheme::normal_text()),
         ]));
     }
 
     stats_lines.push(Line::from(""));
-    stats_lines.push(Line::from(Span::styled("═══ SHORTCUTS ═══", DefaultTheme::info())));
+    stats_lines.push(Line::from(Span::styled("═══ ATALHOS ═══", DefaultTheme::info())));
     stats_lines.push(Line::from(""));
     stats_lines.push(Line::from(vec![
         Span::styled("  Ctrl+E  ", DefaultTheme::info()),
-        Span::styled("Export to CSV", DefaultTheme::dim_text()),
+        Span::styled("Exportar para CSV", DefaultTheme::dim_text()),
     ]));
     stats_lines.push(Line::from(vec![
         Span::styled("  Ctrl+S  ", DefaultTheme::info()),
-        Span::styled("Export to JSON", DefaultTheme::dim_text()),
+        Span::styled("Exportar para JSON", DefaultTheme::dim_text()),
     ]));
     stats_lines.push(Line::from(vec![
         Span::styled("  Ctrl+I  ", DefaultTheme::info()),
-        Span::styled("Copy row as INSERT", DefaultTheme::dim_text()),
+        Span::styled("Copiar linha como INSERT", DefaultTheme::dim_text()),
     ]));
     stats_lines.push(Line::from(vec![
         Span::styled("  Ctrl+Y  ", DefaultTheme::info()),
-        Span::styled("Copy cell value", DefaultTheme::dim_text()),
+        Span::styled("Copiar valor da célula", DefaultTheme::dim_text()),
     ]));
 
     let stats_widget = Paragraph::new(stats_lines)
@@ -572,7 +586,7 @@ fn draw_results_stats(f: &mut Frame, app: &App, area: Rect, active: bool) {
             Block::default()
                 .borders(Borders::ALL)
                 .border_style(border_style)
-                .title(Span::styled(" Stats ", DefaultTheme::title())),
+                .title(Span::styled(" Estatísticas ", DefaultTheme::title())),
         );
 
     f.render_widget(stats_widget, area);
@@ -777,7 +791,7 @@ pub fn draw_history_panel(f: &mut Frame, app: &App, area: Rect, active: bool) {
         DefaultTheme::inactive_border()
     };
 
-    let title = if active { " History [4] ▪ " } else { " History [4] " };
+    let title = if active { " Histórico [4] ▪ " } else { " Histórico [4] " };
 
     let entries = app.history.entries();
     let items: Vec<ListItem> = entries
@@ -952,13 +966,14 @@ fn calculate_cursor_position_with_scroll(app: &App, code_area: Rect) -> (u16, u1
     (x, y)
 }
 
-/// SQL syntax highlighting with scroll support
+/// SQL syntax highlighting with scroll support and visual selection
 fn highlight_sql_with_scroll(
     sql: &str,
     scroll_x: usize,
     scroll_y: usize,
     visible_width: usize,
     visible_height: usize,
+    visual_selection: Option<(usize, usize)>, // (start, end) char positions
 ) -> Vec<Line<'static>> {
     let keywords = [
         "SELECT", "FROM", "WHERE", "AND", "OR", "NOT", "IN", "LIKE", "BETWEEN",
@@ -971,10 +986,25 @@ fn highlight_sql_with_scroll(
         "SUM", "AVG", "MIN", "MAX", "CAST", "CONVERT", "COALESCE", "ISNULL",
     ];
 
+    // Visual selection style (inverted colors)
+    let visual_style = Style::default()
+        .fg(DefaultTheme::BG_DARK)
+        .bg(DefaultTheme::PRIMARY);
+
     let source_lines: Vec<&str> = sql.split('\n').collect();
     let mut lines: Vec<Line> = Vec::new();
 
+    // Calculate absolute character position at the start of each line
+    let mut line_starts: Vec<usize> = vec![0];
+    let mut pos = 0;
+    for line in &source_lines {
+        pos += line.len() + 1; // +1 for newline
+        line_starts.push(pos);
+    }
+
     for (line_idx, line_content) in source_lines.iter().enumerate().skip(scroll_y).take(visible_height) {
+        let line_start_pos = line_starts[line_idx];
+        
         // Apply horizontal scroll
         let display_content: String = line_content
             .chars()
@@ -992,6 +1022,13 @@ fn highlight_sql_with_scroll(
 
         while i < chars.len() {
             let c = chars[i];
+            // Calculate absolute position in the original string
+            let abs_pos = line_start_pos + scroll_x + i;
+            
+            // Check if this character is in visual selection
+            let in_visual = visual_selection.map_or(false, |(start, end)| {
+                abs_pos >= start && abs_pos <= end
+            });
 
             // Check for line comment
             if !in_string && i + 1 < chars.len() && chars[i] == '-' && chars[i + 1] == '-' {
@@ -999,9 +1036,36 @@ fn highlight_sql_with_scroll(
                     spans.push(colorize_word(&current_word, &keywords));
                     current_word.clear();
                 }
+                // Rest of line is comment - check if any part is in selection
                 let comment: String = chars[i..].iter().collect();
-                spans.push(Span::styled(comment, Style::default().fg(DefaultTheme::COMMENT)));
+                if in_visual {
+                    // Handle comment with visual selection
+                    for (j, ch) in comment.chars().enumerate() {
+                        let ch_abs_pos = line_start_pos + scroll_x + i + j;
+                        let ch_in_visual = visual_selection.map_or(false, |(start, end)| {
+                            ch_abs_pos >= start && ch_abs_pos <= end
+                        });
+                        if ch_in_visual {
+                            spans.push(Span::styled(ch.to_string(), visual_style));
+                        } else {
+                            spans.push(Span::styled(ch.to_string(), Style::default().fg(DefaultTheme::COMMENT)));
+                        }
+                    }
+                } else {
+                    spans.push(Span::styled(comment, Style::default().fg(DefaultTheme::COMMENT)));
+                }
                 break;
+            }
+
+            // If in visual selection, use visual style
+            if in_visual {
+                if !current_word.is_empty() {
+                    spans.push(colorize_word(&current_word, &keywords));
+                    current_word.clear();
+                }
+                spans.push(Span::styled(c.to_string(), visual_style));
+                i += 1;
+                continue;
             }
 
             // Handle strings

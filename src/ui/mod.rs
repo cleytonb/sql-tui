@@ -49,7 +49,7 @@ fn draw_loading_popup(f: &mut Frame, app: &App, area: Rect) {
         Line::from(""),
         Line::from(vec![
             Span::styled(
-                format!("  {}  Executing query...  ", spinner),
+                format!("  {}  Executando query...  ", spinner),
                 Style::default()
                     .fg(DefaultTheme::GOLD)
                     .add_modifier(Modifier::BOLD),
