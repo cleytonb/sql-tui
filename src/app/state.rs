@@ -263,6 +263,8 @@ impl App {
 
     /// Load schema tree
     pub async fn load_schema(&mut self) -> Result<()> {
+        use std::collections::HashMap;
+
         let client_arc = self.db.client();
         let mut client = client_arc.lock().await;
 
@@ -271,11 +273,35 @@ impl App {
         let mut views_folder = SchemaNode::new_folder("Views");
         let mut procs_folder = SchemaNode::new_folder("Stored Procedures");
 
-        // Load tables
+        // Helper to get or create schema subfolder
+        fn get_or_create_schema_folder<'a>(
+            parent: &'a mut SchemaNode,
+            schema_folders: &mut HashMap<String, usize>,
+            schema_name: &str,
+        ) -> &'a mut SchemaNode {
+            if let Some(&idx) = schema_folders.get(schema_name) {
+                &mut parent.children[idx]
+            } else {
+                let idx = parent.children.len();
+                let mut folder = SchemaNode::new_folder(schema_name);
+                folder.schema = Some(schema_name.to_string());
+                parent.children.push(folder);
+                schema_folders.insert(schema_name.to_string(), idx);
+                &mut parent.children[idx]
+            }
+        }
+
+        // Load tables grouped by schema
+        let mut table_schema_folders: HashMap<String, usize> = HashMap::new();
         if let Ok(tables) = crate::db::SchemaExplorer::get_tables(&mut client, None).await {
             for table in tables {
-                tables_folder.children.push(SchemaNode {
-                    name: format!("{}.{}", table.schema, table.name),
+                let schema_folder = get_or_create_schema_folder(
+                    &mut tables_folder,
+                    &mut table_schema_folders,
+                    &table.schema,
+                );
+                schema_folder.children.push(SchemaNode {
+                    name: table.name.clone(),
                     node_type: SchemaNodeType::Table,
                     expanded: false,
                     children: Vec::new(),
@@ -284,11 +310,17 @@ impl App {
             }
         }
 
-        // Load views
+        // Load views grouped by schema
+        let mut view_schema_folders: HashMap<String, usize> = HashMap::new();
         if let Ok(views) = crate::db::SchemaExplorer::get_views(&mut client, None).await {
             for view in views {
-                views_folder.children.push(SchemaNode {
-                    name: format!("{}.{}", view.schema, view.name),
+                let schema_folder = get_or_create_schema_folder(
+                    &mut views_folder,
+                    &mut view_schema_folders,
+                    &view.schema,
+                );
+                schema_folder.children.push(SchemaNode {
+                    name: view.name.clone(),
                     node_type: SchemaNodeType::View,
                     expanded: false,
                     children: Vec::new(),
@@ -297,11 +329,17 @@ impl App {
             }
         }
 
-        // Load procedures
+        // Load procedures grouped by schema
+        let mut proc_schema_folders: HashMap<String, usize> = HashMap::new();
         if let Ok(procs) = crate::db::SchemaExplorer::get_procedures(&mut client, None).await {
             for proc in procs {
-                procs_folder.children.push(SchemaNode {
-                    name: format!("{}.{}", proc.schema, proc.name),
+                let schema_folder = get_or_create_schema_folder(
+                    &mut procs_folder,
+                    &mut proc_schema_folders,
+                    &proc.schema,
+                );
+                schema_folder.children.push(SchemaNode {
+                    name: proc.name.clone(),
                     node_type: SchemaNodeType::Procedure,
                     expanded: false,
                     children: Vec::new(),
@@ -426,25 +464,47 @@ impl App {
 
     /// Toggle schema node expansion
     pub fn toggle_schema_node(&mut self) {
-        let visible = self.get_visible_schema_nodes();
-        if let Some((_, node)) = visible.get(self.schema_selected) {
-            // Find and toggle the node
-            let target_name = node.name.clone();
-            Self::toggle_node_by_name(&mut self.schema_tree, &target_name);
+        // Build path to selected node by tracking indices
+        let mut current_idx = 0;
+        let path = Self::find_node_path(&self.schema_tree, self.schema_selected, &mut current_idx);
+        
+        if let Some(path) = path {
+            Self::toggle_node_at_path(&mut self.schema_tree, &path);
         }
     }
 
-    fn toggle_node_by_name(nodes: &mut [SchemaNode], name: &str) -> bool {
-        for node in nodes {
-            if node.name == name {
-                node.expanded = !node.expanded;
-                return true;
+    /// Find the path (indices) to reach the node at the given visible index
+    fn find_node_path(nodes: &[SchemaNode], target_idx: usize, current_idx: &mut usize) -> Option<Vec<usize>> {
+        for (i, node) in nodes.iter().enumerate() {
+            if *current_idx == target_idx {
+                return Some(vec![i]);
             }
-            if Self::toggle_node_by_name(&mut node.children, name) {
-                return true;
+            *current_idx += 1;
+            
+            if node.expanded {
+                if let Some(mut child_path) = Self::find_node_path(&node.children, target_idx, current_idx) {
+                    let mut path = vec![i];
+                    path.append(&mut child_path);
+                    return Some(path);
+                }
             }
         }
-        false
+        None
+    }
+
+    /// Toggle the node at the given path
+    fn toggle_node_at_path(nodes: &mut [SchemaNode], path: &[usize]) {
+        if path.is_empty() {
+            return;
+        }
+        
+        if path.len() == 1 {
+            if let Some(node) = nodes.get_mut(path[0]) {
+                node.expanded = !node.expanded;
+            }
+        } else if let Some(node) = nodes.get_mut(path[0]) {
+            Self::toggle_node_at_path(&mut node.children, &path[1..]);
+        }
     }
 
     /// Insert selected table/view into query
@@ -452,7 +512,13 @@ impl App {
         let visible = self.get_visible_schema_nodes();
         if let Some((_, node)) = visible.get(self.schema_selected) {
             if node.node_type == SchemaNodeType::Table || node.node_type == SchemaNodeType::View {
-                let insert_text = format!("[{}]", node.name);
+                // Build full name with schema if available
+                let full_name = if let Some(ref schema) = node.schema {
+                    format!("{}.{}", schema, node.name)
+                } else {
+                    node.name.clone()
+                };
+                let insert_text = format!("[{}]", full_name);
                 self.query.insert_str(self.cursor_pos, &insert_text);
                 self.cursor_pos += insert_text.len();
                 self.active_panel = ActivePanel::QueryEditor;
