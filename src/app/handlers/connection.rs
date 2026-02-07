@@ -11,7 +11,9 @@ impl App {
         match key.code {
             // Escape - close modal (only if already connected)
             KeyCode::Esc => {
-                if self.is_connected() {
+                if self.connection_modal_focus == ConnectionModalFocus::Form {
+                    self.connection_modal_focus = ConnectionModalFocus::List;
+                } else if self.is_connected() {
                     self.show_connection_modal = false;
                 }
             }
@@ -26,6 +28,7 @@ impl App {
             KeyCode::Down => self.handle_connection_down(),
             KeyCode::Char('k') if self.connection_modal_focus == ConnectionModalFocus::List => self.handle_connection_up(),
             KeyCode::Char('j') if self.connection_modal_focus == ConnectionModalFocus::List => self.handle_connection_down(),
+            KeyCode::BackTab if self.connection_modal_focus == ConnectionModalFocus::Form => self.handle_connection_up(),
             KeyCode::Tab if self.connection_modal_focus == ConnectionModalFocus::Form && key.modifiers.contains(KeyModifiers::SHIFT) => self.handle_connection_up(),
             KeyCode::Tab if self.connection_modal_focus == ConnectionModalFocus::Form => self.handle_connection_down(),
             KeyCode::Char(c) => self.handle_connection_char(c),

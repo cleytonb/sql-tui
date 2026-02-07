@@ -12,9 +12,9 @@ use ratatui::widgets::{Block, Borders, Clear, List, ListItem, Paragraph};
 /// Draw the connection modal
 pub fn draw_connection_modal(f: &mut Frame, app: &App, area: Rect) {
     let modal_area = if app.connection_modal_focus == ConnectionModalFocus::List {
-        centered_rect(20, 60, area)
+        centered_rect(20, 40, area)
     } else {
-        centered_rect(60, 60, area)
+        centered_rect(30, 38, area)
     };
 
     // Clear the background
@@ -26,6 +26,11 @@ pub fn draw_connection_modal(f: &mut Frame, app: &App, area: Rect) {
         .title_style(DefaultTheme::title())
         .borders(Borders::ALL)
         .border_style(DefaultTheme::popup_border())
+        .title_bottom(Line::from(if app.connection_modal_focus == ConnectionModalFocus::List {
+            "[E] Editar [Enter] Conectar".to_string()
+        } else {
+            "[Esc] Voltar [Enter] Salvar e conectar".to_string()
+        }).right_aligned())
         .style(DefaultTheme::popup());
 
     let inner = modal_block.inner(modal_area);
@@ -41,7 +46,7 @@ pub fn draw_connection_modal(f: &mut Frame, app: &App, area: Rect) {
         ])
         .split(inner);
 
-    if (app.connection_modal_focus == ConnectionModalFocus::List) {
+    if app.connection_modal_focus == ConnectionModalFocus::List {
         // Draw left panel (connection list)
         draw_connection_list(f, app, chunks[0]);
     } else {
@@ -175,17 +180,16 @@ fn draw_connection_form(f: &mut Frame, app: &App, area: Rect) {
         DefaultTheme::dim_text()
     };
     
-    let hint_text = if form.is_valid() {
-        "Enter para salvar e conectar"
-    } else {
-        "Preencha todos os campos obrigatórios"
-    };
+    // If the form is not valid, show the hint text
+    if !form.is_valid() {
+        let hint_text = "Preencha todos os campos obrigatórios";
 
-    let hint = Paragraph::new(Line::from(vec![
-        Span::styled("  ", Style::default()),
-        Span::styled(hint_text, hint_style),
-    ]));
-    f.render_widget(hint, field_chunks[ConnectionForm::FIELD_COUNT + 1]);
+        let hint = Paragraph::new(Line::from(vec![
+            Span::styled("  ", Style::default()),
+            Span::styled(hint_text, hint_style),
+        ]));
+        f.render_widget(hint, field_chunks[ConnectionForm::FIELD_COUNT + 1]);
+    }
 }
 
 /// Draw a single form field
