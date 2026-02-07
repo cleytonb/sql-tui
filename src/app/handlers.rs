@@ -107,19 +107,19 @@ impl App {
         }
 
         // 'q' in Normal mode -> switch to QueryEditor
-        if key.code == KeyCode::Char('q') && self.input_mode == InputMode::Normal {
+        if key.code == KeyCode::Char('q') && self.input_mode == InputMode::Normal && self.show_search_schema == false {
             self.active_panel = ActivePanel::QueryEditor;
             return Ok(());
         }
 
         // 'r' in Normal mode -> switch to Results
-        if key.code == KeyCode::Char('r') && self.input_mode == InputMode::Normal {
+        if key.code == KeyCode::Char('r') && self.input_mode == InputMode::Normal && self.show_search_schema == false {
             self.active_panel = ActivePanel::Results;
             return Ok(());
         }
 
         // 's' in Normal mode -> switch to SchemaExplorer
-        if key.code == KeyCode::Char('s') && self.input_mode == InputMode::Normal {
+        if key.code == KeyCode::Char('s') && self.input_mode == InputMode::Normal && self.show_search_schema == false {
             self.active_panel = ActivePanel::SchemaExplorer;
             return Ok(());
         }
@@ -656,11 +656,45 @@ impl App {
 
     /// Schema explorer
     fn handle_schema(&mut self, key: KeyEvent) -> Result<()> {
+        // Se o modo de busca está ativo, processa input do campo de busca
+        if self.show_search_schema {
+            match key.code {
+                KeyCode::Esc => {
+                    self.show_search_schema = false;
+                    self.schema_search_query.clear();
+                    self.schema_selected = 0;
+                }
+                KeyCode::Enter => {
+                    self.show_search_schema = false;
+                    // Mantém o filtro ativo
+                }
+                KeyCode::Backspace => {
+                    self.schema_search_query.pop();
+                    self.schema_selected = 0;
+                }
+                KeyCode::Char(c) => {
+                    self.schema_search_query.push(c);
+                    self.schema_selected = 0;
+                }
+                KeyCode::Up | KeyCode::Down => {
+                    // Permite navegar mesmo durante a busca
+                    let max = self.get_visible_schema_nodes().len().saturating_sub(1);
+                    if key.code == KeyCode::Up {
+                        self.schema_selected = self.schema_selected.saturating_sub(1);
+                    } else if self.schema_selected < max {
+                        self.schema_selected += 1;
+                    }
+                }
+                _ => {}
+            }
+            return Ok(());
+        }
+
         match key.code {
-            KeyCode::Up => {
+            KeyCode::Up | KeyCode::Char('k') => {
                 self.schema_selected = self.schema_selected.saturating_sub(1);
             }
-            KeyCode::Down => {
+            KeyCode::Down | KeyCode::Char('j') => {
                 let max = self.get_visible_schema_nodes().len().saturating_sub(1);
                 if self.schema_selected < max {
                     self.schema_selected += 1;
@@ -676,8 +710,18 @@ impl App {
                     }
                 }
             }
+            KeyCode::Char('/') => {
+                self.show_search_schema = true;
+                self.schema_search_query.clear();
+            }
             KeyCode::Esc => {
-                self.active_panel = ActivePanel::QueryEditor;
+                // Se há busca ativa, limpa a busca primeiro
+                if !self.schema_search_query.is_empty() {
+                    self.schema_search_query.clear();
+                    self.schema_selected = 0;
+                } else {
+                    self.active_panel = ActivePanel::QueryEditor;
+                }
             }
             _ => {}
         }

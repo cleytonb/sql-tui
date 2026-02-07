@@ -164,6 +164,12 @@ pub struct App {
 
     /// Query editor vertical scroll offset
     pub query_scroll_y: usize,
+
+    /// Show search input in schema explorer
+    pub show_search_schema: bool,
+
+    /// Search query for schema explorer
+    pub schema_search_query: String,
 }
 
 /// Spinner animation frames
@@ -212,6 +218,8 @@ impl App {
             pending_query_text: None,
             query_scroll_x: 0,
             query_scroll_y: 0,
+            show_search_schema: false,
+            schema_search_query: String::new(),
         };
 
         // Load initial schema
@@ -447,8 +455,17 @@ impl App {
     /// Get flattened schema tree for display
     pub fn get_visible_schema_nodes(&self) -> Vec<(usize, &SchemaNode)> {
         let mut nodes = Vec::new();
-        for node in &self.schema_tree {
-            Self::flatten_node(node, 0, &mut nodes);
+        
+        // Se há busca ativa, filtra os nós
+        if !self.schema_search_query.is_empty() {
+            let query = self.schema_search_query.to_lowercase();
+            for node in &self.schema_tree {
+                Self::flatten_node_filtered(node, 0, &mut nodes, &query);
+            }
+        } else {
+            for node in &self.schema_tree {
+                Self::flatten_node(node, 0, &mut nodes);
+            }
         }
         nodes
     }
@@ -460,6 +477,40 @@ impl App {
                 Self::flatten_node(child, depth + 1, nodes);
             }
         }
+    }
+
+    /// Flatten node with filter - shows matching nodes and their parents
+    fn flatten_node_filtered<'a>(
+        node: &'a SchemaNode,
+        depth: usize,
+        nodes: &mut Vec<(usize, &'a SchemaNode)>,
+        query: &str,
+    ) {
+        let node_matches = node.name.to_lowercase().contains(query);
+        let has_matching_children = Self::has_matching_children(node, query);
+
+        // Mostra o nó se ele ou algum filho corresponde à busca
+        if node_matches || has_matching_children {
+            nodes.push((depth, node));
+
+            // Se tem filhos que correspondem, mostra todos os filhos recursivamente
+            for child in &node.children {
+                Self::flatten_node_filtered(child, depth + 1, nodes, query);
+            }
+        }
+    }
+
+    /// Check if a node or any of its descendants match the query
+    fn has_matching_children(node: &SchemaNode, query: &str) -> bool {
+        for child in &node.children {
+            if child.name.to_lowercase().contains(query) {
+                return true;
+            }
+            if Self::has_matching_children(child, query) {
+                return true;
+            }
+        }
+        false
     }
 
     /// Toggle schema node expansion
