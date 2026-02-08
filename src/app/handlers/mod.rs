@@ -145,9 +145,13 @@ impl App {
             return Ok(());
         }
 
-        // Esc no QueryEditor em modo Insert -> volta para Normal
+        // Esc no QueryEditor em modo Insert -> fecha completion primeiro, só depois volta para Normal
         if key.code == KeyCode::Esc && self.active_panel == ActivePanel::QueryEditor && self.input_mode == InputMode::Insert {
-            self.input_mode = InputMode::Normal;
+            if self.completion.visible {
+                self.completion.hide();
+            } else {
+                self.input_mode = InputMode::Normal;
+            }
             return Ok(());
         }
 

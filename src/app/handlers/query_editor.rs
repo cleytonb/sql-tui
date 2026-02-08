@@ -28,6 +28,72 @@ impl App {
         indent
     }
 
+    /// Get the current line text (before cursor, from line start)
+    fn get_current_line_text(&self) -> String {
+        let text_before: String = self.query.chars().take(self.cursor_pos).collect();
+        let line_start = if let Some(last_newline) = text_before.rfind('\n') {
+            last_newline + 1
+        } else {
+            0
+        };
+        text_before[line_start..].to_string()
+    }
+
+    /// Insert newline with auto-indentation and BEGIN/END autoclose
+    fn insert_newline_with_autoclose(&mut self) {
+        let indent = self.get_current_line_indent();
+        let current_line = self.get_current_line_text();
+        let trimmed_line = current_line.trim_end();
+
+        // Check if line ends with BEGIN (case-insensitive)
+        let ends_with_begin = trimmed_line
+            .to_uppercase()
+            .ends_with("BEGIN");
+
+        if ends_with_begin {
+            // Insert: \n<indent>    <cursor>\n<indent>END
+            let inner_indent = format!("{}    ", indent);
+
+            // Two newlines + inner indent (cursor line)
+            self.query.insert(self.cursor_pos, '\n');
+            self.cursor_pos += 1;
+            self.query.insert(self.cursor_pos, '\n');
+            self.cursor_pos += 1;
+            for c in inner_indent.chars() {
+                self.query.insert(self.cursor_pos, c);
+                self.cursor_pos += 1;
+            }
+
+            // Save cursor position (this is where the user will type)
+            let cursor_final = self.cursor_pos;
+
+            // Two newlines + original indent + END
+            self.query.insert(self.cursor_pos, '\n');
+            self.cursor_pos += 1;
+            self.query.insert(self.cursor_pos, '\n');
+            self.cursor_pos += 1;
+            for c in indent.chars() {
+                self.query.insert(self.cursor_pos, c);
+                self.cursor_pos += 1;
+            }
+            for c in "END".chars() {
+                self.query.insert(self.cursor_pos, c);
+                self.cursor_pos += 1;
+            }
+
+            // Move cursor back to the inner line
+            self.cursor_pos = cursor_final;
+        } else {
+            // Normal newline with auto-indent
+            self.query.insert(self.cursor_pos, '\n');
+            self.cursor_pos += 1;
+            for c in indent.chars() {
+                self.query.insert(self.cursor_pos, c);
+                self.cursor_pos += 1;
+            }
+        }
+    }
+
     /// Query Editor handler
     pub(crate) fn handle_query_editor(&mut self, key: KeyEvent) -> Result<()> {
         // Comandos que funcionam em ambos os modos
@@ -106,26 +172,13 @@ impl App {
             KeyCode::Enter => {
                 self.completion.hide();
                 self.save_undo_state();
-                let indent = self.get_current_line_indent();
-                self.query.insert(self.cursor_pos, '\n');
-                self.cursor_pos += 1;
-                // Insert the same indentation on the new line
-                for c in indent.chars() {
-                    self.query.insert(self.cursor_pos, c);
-                    self.cursor_pos += 1;
-                }
+                self.insert_newline_with_autoclose();
             }
             // Ctrl+J = Line Feed (Shift+Enter in some terminals like iTerm2)
             KeyCode::Char('j') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 self.completion.hide();
                 self.save_undo_state();
-                let indent = self.get_current_line_indent();
-                self.query.insert(self.cursor_pos, '\n');
-                self.cursor_pos += 1;
-                for c in indent.chars() {
-                    self.query.insert(self.cursor_pos, c);
-                    self.cursor_pos += 1;
-                }
+                self.insert_newline_with_autoclose();
             }
             // Tab = accept completion OR insert 4 spaces
             KeyCode::Tab => {
