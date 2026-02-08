@@ -85,6 +85,14 @@ fn get_candidates_internal(
             }
             items
         }
+        SqlContext::AfterInsertIntoColumns { table_ref } => {
+            // Suggest columns for INSERT: all columns combined (without identity) + individual columns
+            find_columns_for_insert(table_ref, schema_tree, column_cache)
+        }
+        SqlContext::AfterUpdateSet { table_ref } => {
+            // Suggest individual columns for UPDATE SET
+            find_columns_for_table(table_ref, schema_tree, column_cache)
+        }
         SqlContext::General { prefix: _ } => {
             let mut items = sql_keywords();
             items.extend(find_all_objects(schema_tree));
@@ -100,12 +108,18 @@ fn get_candidates_internal(
         });
     }
     
-    // Sort: columns first when in column context, then keywords, then by label
+    // Sort: ColumnList first (INSERT all columns), then columns, then keywords, then by label
     items.sort_by(|a, b| {
         match (&a.kind, &b.kind) {
+            // ColumnList has highest priority (for INSERT all columns suggestion)
+            (CompletionKind::ColumnList, CompletionKind::ColumnList) => a.label.cmp(&b.label),
+            (CompletionKind::ColumnList, _) => std::cmp::Ordering::Less,
+            (_, CompletionKind::ColumnList) => std::cmp::Ordering::Greater,
+            // Then columns
             (CompletionKind::Column, CompletionKind::Column) => a.label.cmp(&b.label),
             (CompletionKind::Column, _) => std::cmp::Ordering::Less,
             (_, CompletionKind::Column) => std::cmp::Ordering::Greater,
+            // Then keywords
             (CompletionKind::Keyword, CompletionKind::Keyword) => a.label.cmp(&b.label),
             (CompletionKind::Keyword, _) => std::cmp::Ordering::Less,
             (_, CompletionKind::Keyword) => std::cmp::Ordering::Greater,
@@ -164,6 +178,90 @@ fn find_columns_for_table(
                             });
                         }
                         return items;
+                    }
+                }
+            }
+        }
+    }
+    
+    items
+}
+
+/// Find columns for INSERT statement
+/// Returns: all non-identity columns combined (for quick insert) + individual columns
+fn find_columns_for_insert(
+    table_ref: &TableRef,
+    schema_tree: &[SchemaNode],
+    column_cache: &HashMap<(String, String), Vec<ColumnDef>>,
+) -> Vec<CompletionItem> {
+    let items = Vec::new();
+    
+    // Helper to process columns once we find them
+    let process_columns = |columns: &[ColumnDef]| -> Vec<CompletionItem> {
+        let mut result = Vec::new();
+        
+        // Collect non-identity columns for the combined suggestion
+        let non_identity_cols: Vec<&ColumnDef> = columns.iter()
+            .filter(|c| !c.is_identity)
+            .collect();
+        
+        // First item: all non-identity columns combined with closing parenthesis
+        if !non_identity_cols.is_empty() {
+            let combined_names: Vec<&str> = non_identity_cols.iter()
+                .map(|c| c.name.as_str())
+                .collect();
+            let combined_text = format!("{})", combined_names.join(", "));
+            let combined_label = combined_text.clone();
+            
+            result.push(CompletionItem {
+                label: combined_label,
+                kind: CompletionKind::ColumnList,  // Use ColumnList for highest priority
+                insert_text: combined_text,
+                detail: Some("All columns".to_string()),
+            });
+        }
+        
+        // Then add individual columns (all columns, including identity)
+        for col in columns {
+            let detail = format!(
+                "{} ({}){}",
+                col.data_type,
+                if col.is_nullable { "NULL" } else { "NOT NULL" },
+                if col.is_identity { " IDENTITY" } else { "" }
+            );
+            result.push(CompletionItem {
+                label: col.name.clone(),
+                kind: CompletionKind::Column,
+                insert_text: col.name.clone(),
+                detail: Some(detail),
+            });
+        }
+        
+        result
+    };
+    
+    // If we have schema info, use it directly
+    if let Some(ref schema) = table_ref.schema {
+        let key = (schema.clone(), table_ref.table.clone());
+        if let Some(columns) = column_cache.get(&key) {
+            return process_columns(columns);
+        }
+    }
+    
+    // If no schema provided, search all schemas for this table
+    for root_folder in schema_tree {
+        if root_folder.name != "Tables" && root_folder.name != "Views" {
+            continue;
+        }
+        
+        for schema_folder in &root_folder.children {
+            let schema_name = &schema_folder.name;
+            
+            for obj in &schema_folder.children {
+                if obj.name.eq_ignore_ascii_case(&table_ref.table) {
+                    let key = (schema_name.clone(), obj.name.clone());
+                    if let Some(columns) = column_cache.get(&key) {
+                        return process_columns(columns);
                     }
                 }
             }

@@ -48,6 +48,7 @@ pub struct ColumnDef {
     pub data_type: String,
     pub is_nullable: bool,
     pub is_primary_key: bool,
+    pub is_identity: bool,
     pub max_length: Option<i32>,
     pub precision: Option<i32>,
     pub scale: Option<i32>,
@@ -196,6 +197,7 @@ impl SchemaExplorer {
                 t.name as data_type,
                 c.is_nullable,
                 ISNULL(pk.is_primary_key, 0) as is_primary_key,
+                c.is_identity,
                 c.max_length,
                 c.precision,
                 c.scale
@@ -225,9 +227,10 @@ impl SchemaExplorer {
                     data_type: row.get::<&str, _>(1).unwrap_or("").to_string(),
                     is_nullable: row.get::<bool, _>(2).unwrap_or(true),
                     is_primary_key: row.get::<i32, _>(3).unwrap_or(0) == 1,
-                    max_length: row.get::<i16, _>(4).map(|v| v as i32),
-                    precision: row.get::<u8, _>(5).map(|v| v as i32),
-                    scale: row.get::<u8, _>(6).map(|v| v as i32),
+                    is_identity: row.get::<bool, _>(4).unwrap_or(false),
+                    max_length: row.get::<i16, _>(5).map(|v| v as i32),
+                    precision: row.get::<u8, _>(6).map(|v| v as i32),
+                    scale: row.get::<u8, _>(7).map(|v| v as i32),
                 });
             }
         }

@@ -136,6 +136,8 @@ impl CompletionItem {
 /// Type of completion item
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CompletionKind {
+    /// Combined column list for INSERT (highest priority)
+    ColumnList,
     /// SQL keyword (SELECT, FROM, WHERE, etc.)
     Keyword,
     /// Database schema
@@ -156,6 +158,7 @@ impl CompletionKind {
     /// Get the display icon for this kind
     pub fn icon(&self) -> &'static str {
         match self {
+            CompletionKind::ColumnList => "󰠷 ",
             CompletionKind::Keyword => "󰌆 ",
             CompletionKind::Schema => " ",
             CompletionKind::Table => "󰓫 ",
@@ -169,6 +172,7 @@ impl CompletionKind {
     /// Get a short label for this kind
     pub fn label(&self) -> &'static str {
         match self {
+            CompletionKind::ColumnList => "cl",
             CompletionKind::Keyword => "kw",
             CompletionKind::Schema => "sc",
             CompletionKind::Table => "tb",

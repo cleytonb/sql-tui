@@ -48,6 +48,18 @@ pub enum SqlContext {
         tables: Vec<TableRef>,
     },
 
+    /// After INSERT INTO table( - suggest columns for insert
+    /// Example: INSERT INTO pmt.Contas(|
+    AfterInsertIntoColumns {
+        table_ref: TableRef,
+    },
+
+    /// After UPDATE table SET - suggest columns for update
+    /// Example: UPDATE pmt.Contas SET |
+    AfterUpdateSet {
+        table_ref: TableRef,
+    },
+
     /// General context - suggest keywords and all objects
     General {
         prefix: String,
@@ -80,6 +92,8 @@ enum CurrentClause {
     Having,
     Set,
     Exec,
+    InsertInto,
+    Update,
     Unknown,
 }
 
@@ -105,6 +119,8 @@ fn detect_current_clause(upper_text: &str) -> CurrentClause {
         ("SET ", CurrentClause::Set),
         ("EXEC ", CurrentClause::Exec),
         ("EXECUTE ", CurrentClause::Exec),
+        ("INSERT INTO ", CurrentClause::InsertInto),
+        ("UPDATE ", CurrentClause::Update),
     ];
     
     // Find the last occurrence of each keyword
@@ -194,8 +210,14 @@ pub fn extract_context(query: &str, cursor_pos: usize) -> SqlContext {
     // Extract tables referenced in the query (for column suggestions)
     let tables = extract_table_references(query);
     
+    // === PRIORITY 0: INSERT INTO columns context ===
+    // Check this FIRST because INSERT INTO table( should suggest columns, not dot context
+    if let Some(table_ref) = extract_insert_table_in_columns(&before_upper, before_cursor) {
+        return SqlContext::AfterInsertIntoColumns { table_ref };
+    }
+    
     // === PRIORITY 1: Dot contexts (schema.| or alias.|) ===
-    // These take precedence over everything else
+    // These take precedence over most other contexts
     if let Some(dot_context) = check_dot_context(before_cursor, &before_upper, &tables) {
         return dot_context;
     }
@@ -228,8 +250,19 @@ pub fn extract_context(query: &str, cursor_pos: usize) -> SqlContext {
             return SqlContext::AfterWhere { tables: tables.clone() };
         }
         CurrentClause::Set => {
-            // SET expects column names
+            // SET expects column names - check if we're in UPDATE context
+            if let Some(table_ref) = extract_update_table(&before_upper, before_cursor) {
+                return SqlContext::AfterUpdateSet { table_ref };
+            }
+            // Fallback to AfterWhere if we can't extract the table
             return SqlContext::AfterWhere { tables: tables.clone() };
+        }
+        CurrentClause::InsertInto => {
+            // INSERT column list is checked at priority 0, so if we're here
+            // we're still typing table name - fall through to General
+        }
+        CurrentClause::Update => {
+            // Still typing table name after UPDATE, fall through to General
         }
         CurrentClause::Unknown => {
             // Fall through to General
@@ -239,6 +272,83 @@ pub fn extract_context(query: &str, cursor_pos: usize) -> SqlContext {
     // 7. Default: general context with current prefix
     let prefix = extract_current_word(before_cursor);
     SqlContext::General { prefix }
+}
+
+/// Extract table from INSERT INTO table( context
+/// Returns Some(TableRef) if we're inside the column list parentheses
+fn extract_insert_table_in_columns(upper_text: &str, original_text: &str) -> Option<TableRef> {
+    // Pattern: INSERT INTO [schema.]table (
+    // We need to find the table name and check if we're inside ( )
+    
+    // Find "INSERT INTO " position
+    let insert_pos = upper_text.rfind("INSERT INTO ")?;
+    let after_insert = insert_pos + "INSERT INTO ".len();
+    
+    // Check if there's an open parenthesis after the table name
+    let text_after = &original_text[after_insert..];
+    let paren_pos = text_after.find('(')?;
+    
+    // Extract the table name (between INSERT INTO and the parenthesis)
+    let table_part = text_after[..paren_pos].trim();
+    if table_part.is_empty() {
+        return None;
+    }
+    
+    // Check if we haven't closed the parenthesis yet (still inside column list)
+    let after_paren = &text_after[paren_pos + 1..];
+    if after_paren.contains(')') {
+        // Already closed, not in column list anymore
+        return None;
+    }
+    
+    // Parse the table reference
+    parse_simple_table_reference(table_part)
+}
+
+/// Extract table from UPDATE table SET context
+fn extract_update_table(upper_text: &str, original_text: &str) -> Option<TableRef> {
+    // Pattern: UPDATE [schema.]table SET
+    
+    // Find "UPDATE " position
+    let update_pos = upper_text.rfind("UPDATE ")?;
+    let after_update = update_pos + "UPDATE ".len();
+    
+    // Find "SET " after UPDATE
+    let set_pos = upper_text[after_update..].find(" SET ")?;
+    
+    // Extract table name between UPDATE and SET
+    let table_part = original_text[after_update..after_update + set_pos].trim();
+    if table_part.is_empty() {
+        return None;
+    }
+    
+    // Parse the table reference
+    parse_simple_table_reference(table_part)
+}
+
+/// Parse a simple table reference like "schema.table" or "table"
+fn parse_simple_table_reference(text: &str) -> Option<TableRef> {
+    let text = text.trim().trim_matches(|c| c == '[' || c == ']');
+    if text.is_empty() {
+        return None;
+    }
+    
+    // Check for schema.table format
+    if let Some(dot_pos) = text.find('.') {
+        let schema = text[..dot_pos].trim().trim_matches(|c| c == '[' || c == ']');
+        let table = text[dot_pos + 1..].trim().trim_matches(|c| c == '[' || c == ']');
+        Some(TableRef {
+            schema: Some(schema.to_string()),
+            table: table.to_string(),
+            alias: None,
+        })
+    } else {
+        Some(TableRef {
+            schema: None,
+            table: text.to_string(),
+            alias: None,
+        })
+    }
 }
 
 /// Extract table references from the query (FROM and JOIN clauses)
@@ -559,5 +669,63 @@ mod tests {
         let neg = neg.unwrap();
         assert_eq!(neg.alias, Some("nc".to_string()));
         assert_eq!(neg.schema, Some("pmt".to_string()));
+    }
+
+    #[test]
+    fn test_insert_into_columns_context() {
+        // INSERT INTO pmt.Contas(| - should suggest columns
+        let query = "INSERT INTO pmt.Contas(";
+        let ctx = extract_context(query, query.len());
+        assert!(matches!(
+            &ctx,
+            SqlContext::AfterInsertIntoColumns { table_ref } 
+            if table_ref.table == "Contas" && table_ref.schema == Some("pmt".to_string())
+        ), "Expected AfterInsertIntoColumns, got {:?}", ctx);
+    }
+
+    #[test]
+    fn test_insert_into_columns_partial() {
+        // INSERT INTO Contas(Nome, | - still in column list
+        let query = "INSERT INTO Contas(Nome, ";
+        let ctx = extract_context(query, query.len());
+        assert!(matches!(
+            &ctx,
+            SqlContext::AfterInsertIntoColumns { table_ref } 
+            if table_ref.table == "Contas"
+        ), "Expected AfterInsertIntoColumns, got {:?}", ctx);
+    }
+
+    #[test]
+    fn test_insert_into_columns_closed() {
+        // INSERT INTO Contas(Nome) VALUES (| - parenthesis closed, not in column list
+        let query = "INSERT INTO Contas(Nome) VALUES (";
+        let ctx = extract_context(query, query.len());
+        // Should NOT be AfterInsertIntoColumns because parens are closed
+        assert!(!matches!(ctx, SqlContext::AfterInsertIntoColumns { .. }), 
+            "Should not be AfterInsertIntoColumns after closing parens, got {:?}", ctx);
+    }
+
+    #[test]
+    fn test_update_set_context() {
+        // UPDATE pmt.Contas SET | - should suggest columns
+        let query = "UPDATE pmt.Contas SET ";
+        let ctx = extract_context(query, query.len());
+        assert!(matches!(
+            &ctx,
+            SqlContext::AfterUpdateSet { table_ref } 
+            if table_ref.table == "Contas" && table_ref.schema == Some("pmt".to_string())
+        ), "Expected AfterUpdateSet, got {:?}", ctx);
+    }
+
+    #[test]
+    fn test_update_set_with_alias() {
+        // UPDATE Contas SET Nome = | - still in SET context
+        let query = "UPDATE Contas SET Nome = 'teste', ";
+        let ctx = extract_context(query, query.len());
+        assert!(matches!(
+            &ctx,
+            SqlContext::AfterUpdateSet { table_ref } 
+            if table_ref.table == "Contas"
+        ), "Expected AfterUpdateSet, got {:?}", ctx);
     }
 }

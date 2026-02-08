@@ -101,6 +101,7 @@ pub fn draw_completion_popup(f: &mut Frame, app: &App, editor_area: Rect) {
             
             // Build the display line
             let kind_indicator = match item.kind {
+                CompletionKind::ColumnList => "*",
                 CompletionKind::Keyword => "K",
                 CompletionKind::Schema => "S",
                 CompletionKind::Table => "T",
@@ -111,6 +112,7 @@ pub fn draw_completion_popup(f: &mut Frame, app: &App, editor_area: Rect) {
             };
             
             let kind_color = match item.kind {
+                CompletionKind::ColumnList => DefaultTheme::SUCCESS,
                 CompletionKind::Keyword => DefaultTheme::KEYWORD,
                 CompletionKind::Schema => DefaultTheme::INFO,
                 CompletionKind::Table => DefaultTheme::SUCCESS,
