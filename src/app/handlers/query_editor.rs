@@ -126,6 +126,17 @@ impl App {
                     }
                 }
             }
+            // BackTab = remove 4 spaces
+            KeyCode::BackTab => {
+                if !self.completion.visible {
+                    for _ in 0..4 {
+                        if self.cursor_pos > 0 {
+                            self.cursor_pos -= 1;
+                            self.query.remove(self.cursor_pos);
+                        }
+                    }
+                }
+            }
             // Ctrl+Space = force trigger completion
             KeyCode::Char(' ') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 self.trigger_completion();
