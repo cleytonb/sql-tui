@@ -27,6 +27,14 @@ impl App {
                     ResultsTab::Stats => ResultsTab::Data,
                 };
             }
+            KeyCode::Char('d') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                self.pending_scroll += 10;
+                return Ok(());
+            }
+            KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                self.pending_scroll -= 10;
+                return Ok(());
+            }
             KeyCode::Up | KeyCode::Char('k') => {
                 self.results_selected = self.results_selected.saturating_sub(1);
             }

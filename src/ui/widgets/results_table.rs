@@ -187,11 +187,14 @@ fn draw_results_data(f: &mut Frame, app: &mut App, area: Rect, active: bool) {
 
     // Create data rows with row numbers
     let visible_height = area.height.saturating_sub(3) as usize;
-    let scroll_offset = if app.results_selected >= visible_height {
-        app.results_selected.saturating_sub(visible_height - 1)
-    } else {
-        0
-    };
+
+    // Ajusta o offset de scroll para manter o item selecionado visível
+    if app.results_selected < app.results_scroll {
+        app.results_scroll = app.results_selected;
+    } else if app.results_selected >= app.results_scroll + visible_height {
+        app.results_scroll = app.results_selected.saturating_sub(visible_height.saturating_sub(1));
+    }
+    let scroll_offset = app.results_scroll;
 
     let rows: Vec<Row> = app
         .result
@@ -295,7 +298,7 @@ fn draw_results_data(f: &mut Frame, app: &mut App, area: Rect, active: bool) {
 }
 
 /// Draw the columns tab (column info)
-fn draw_results_columns(f: &mut Frame, app: &App, area: Rect, active: bool) {
+fn draw_results_columns(f: &mut Frame, app: &mut App, area: Rect, active: bool) {
     let border_style = if active {
         DefaultTheme::active_border()
     } else {
@@ -306,11 +309,13 @@ fn draw_results_columns(f: &mut Frame, app: &App, area: Rect, active: bool) {
 
     // Create column info rows - use results_selected for vertical scrolling
     let visible_height = area.height.saturating_sub(3) as usize;
-    let scroll_offset = if app.results_selected >= visible_height {
-        app.results_selected.saturating_sub(visible_height - 1)
-    } else {
-        0
-    };
+
+    if app.results_selected < app.results_scroll {
+        app.results_scroll = app.results_selected;
+    } else if app.results_selected >= app.results_scroll + visible_height {
+        app.results_scroll = app.results_selected.saturating_sub(visible_height.saturating_sub(1));
+    }
+    let scroll_offset = app.results_scroll;
 
     let rows: Vec<Row> = app
         .result
