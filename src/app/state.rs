@@ -140,6 +140,8 @@ pub struct App {
     pub last_char_search: Option<(char, bool, bool)>,
     /// Pending operator waiting for character input (f, F, t, T)
     pub pending_char_search: Option<char>,
+    /// Pending g prefix (waiting for second key: g, _, e, etc.)
+    pub pending_g: bool,
     /// Autocomplete state
     pub completion: CompletionState,
 
@@ -266,6 +268,7 @@ impl App {
             visual_anchor: 0,
             last_char_search: None,
             pending_char_search: None,
+            pending_g: false,
             completion: CompletionState::new(),
             result: QueryResult::empty(),
             is_loading: false,

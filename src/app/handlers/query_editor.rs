@@ -451,6 +451,49 @@ impl App {
         }
     }
 
+    /// Handle g prefix motions (gg, g_, ge, etc.)
+    fn handle_g_motion(&mut self, ch: char) {
+        match ch {
+            // gg = go to start of document
+            'g' => {
+                self.cursor_pos = 0;
+            }
+            // g_ = go to last non-whitespace character of current line
+            '_' => {
+                let text_after: String = self.query.chars().skip(self.cursor_pos).collect();
+                let line_end = if let Some(next_newline) = text_after.find('\n') {
+                    self.cursor_pos + next_newline
+                } else {
+                    self.query.len()
+                };
+                // Walk backwards from line end to find last non-whitespace
+                let chars: Vec<char> = self.query.chars().collect();
+                let mut target = line_end.saturating_sub(1);
+                while target > 0 && (chars.get(target) == Some(&' ') || chars.get(target) == Some(&'\t') || chars.get(target) == Some(&'\n')) {
+                    target = target.saturating_sub(1);
+                }
+                self.cursor_pos = target;
+            }
+            // ge = go to end of previous word
+            'e' => {
+                if self.cursor_pos > 0 {
+                    let chars: Vec<char> = self.query.chars().collect();
+                    let mut pos = self.cursor_pos.saturating_sub(1);
+                    // Skip whitespace backwards
+                    while pos > 0 && chars[pos].is_whitespace() {
+                        pos -= 1;
+                    }
+                    // Skip word chars backwards
+                    while pos > 0 && !chars[pos - 1].is_whitespace() {
+                        pos -= 1;
+                    }
+                    self.cursor_pos = pos;
+                }
+            }
+            _ => {}
+        }
+    }
+
     /// Handle Normal mode - vim commands
     fn handle_normal_mode(&mut self, key: KeyEvent) -> Result<()> {
         // Handle pending character search (f/F/t/T waiting for char)
@@ -464,6 +507,15 @@ impl App {
                     'T' => { self.find_char_backward(ch, true); }
                     _ => {}
                 }
+            }
+            return Ok(());
+        }
+
+        // Handle pending g prefix (gg, g_, ge, etc.)
+        if self.pending_g {
+            self.pending_g = false;
+            if let KeyCode::Char(ch) = key.code {
+                self.handle_g_motion(ch);
             }
             return Ok(());
         }
@@ -576,10 +628,11 @@ impl App {
             KeyCode::Char(',') => {
                 self.repeat_char_search_opposite();
             }
-            // Document start/end
+            // g prefix (gg, g_, ge, etc.)
             KeyCode::Char('g') => {
-                self.cursor_pos = 0;
+                self.pending_g = true;
             }
+            // G = go to end of document
             KeyCode::Char('G') => {
                 self.cursor_pos = self.query.len().saturating_sub(1);
             }
@@ -725,6 +778,15 @@ impl App {
             return Ok(());
         }
 
+        // Handle pending g prefix
+        if self.pending_g {
+            self.pending_g = false;
+            if let KeyCode::Char(ch) = key.code {
+                self.handle_g_motion(ch);
+            }
+            return Ok(());
+        }
+
         match key.code {
             // Exit visual mode
             KeyCode::Esc | KeyCode::Char('v') => {
@@ -808,10 +870,11 @@ impl App {
             KeyCode::Char(',') => {
                 self.repeat_char_search_opposite();
             }
-            // Document start/end
+            // g prefix (gg, g_, ge, etc.)
             KeyCode::Char('g') => {
-                self.cursor_pos = 0;
+                self.pending_g = true;
             }
+            // G = go to end of document
             KeyCode::Char('G') => {
                 self.cursor_pos = self.query.len().saturating_sub(1);
             }
