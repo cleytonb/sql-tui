@@ -1,4 +1,4 @@
-# sql_tui
+# sql-tui
 
 A high-performance SQL Server TUI client built with Rust. Navigate databases, write queries with vim keybindings, and explore results — all from your terminal.
 
