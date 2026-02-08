@@ -8,6 +8,7 @@ use ratatui::prelude::*;
 use ratatui::widgets::{Block, Borders, Cell, Paragraph, Row, Scrollbar, ScrollbarOrientation, ScrollbarState, Table};
 use ratatui::layout::Margin;
 use std::collections::HashMap;
+use rust_i18n::t;
 
 /// Draw the results table panel with tabs
 pub fn draw_results_table(f: &mut Frame, app: &mut App, area: Rect, active: bool) {
@@ -38,12 +39,12 @@ pub fn draw_results_table(f: &mut Frame, app: &mut App, area: Rect, active: bool
     if app.result.columns.is_empty() {
         let help_text = vec![
             Line::from(""),
-            Line::from(Span::styled("No results yet", DefaultTheme::dim_text())),
+            Line::from(Span::styled(t!("no_results").to_string(), DefaultTheme::dim_text())),
             Line::from(""),
             Line::from(vec![
-                Span::styled("Type a query and press ", DefaultTheme::dim_text()),
+                Span::styled(t!("type_query_hint").to_string(), DefaultTheme::dim_text()),
                 Span::styled("Enter", DefaultTheme::info()),
-                Span::styled(" to execute", DefaultTheme::dim_text()),
+                Span::styled(t!("to_execute").to_string(), DefaultTheme::dim_text()),
             ]),
         ];
         let empty_msg = Paragraph::new(help_text)
@@ -419,26 +420,26 @@ fn draw_results_stats(f: &mut Frame, app: &App, area: Rect, active: bool) {
     // Build stats text
     let stats_lines: Vec<Line> = vec![
         Line::from(""),
-        Line::from(Span::styled("═══ ESTATÍSTICAS DA QUERY ═══", DefaultTheme::info())),
+        Line::from(Span::styled(t!("stats_header").to_string(), DefaultTheme::info())),
         Line::from(""),
         Line::from(vec![
-            Span::styled("  Tempo de Execução:  ", DefaultTheme::dim_text()),
+            Span::styled(t!("execution_time").to_string(), DefaultTheme::dim_text()),
             Span::styled(format!("{:.2} ms", exec_ms), DefaultTheme::success()),
         ]),
         Line::from(vec![
-            Span::styled("  Linhas Retornadas:  ", DefaultTheme::dim_text()),
+            Span::styled(t!("rows_returned").to_string(), DefaultTheme::dim_text()),
             Span::styled(format_number(app.result.row_count as i64), DefaultTheme::info()),
         ]),
         Line::from(vec![
-            Span::styled("  Colunas:            ", DefaultTheme::dim_text()),
+            Span::styled(t!("columns").to_string(), DefaultTheme::dim_text()),
             Span::styled(format!("{}", app.result.columns.len()), DefaultTheme::info()),
         ]),
         Line::from(vec![
-            Span::styled("  Total de Células:   ", DefaultTheme::dim_text()),
+            Span::styled(t!("total_cells").to_string(), DefaultTheme::dim_text()),
             Span::styled(format_number(total_cells as i64), DefaultTheme::normal_text()),
         ]),
         Line::from(vec![
-            Span::styled("  Valores NULL:       ", DefaultTheme::dim_text()),
+            Span::styled(t!("null_values").to_string(), DefaultTheme::dim_text()),
             Span::styled(format!("{} ({:.1}%)", format_number(null_count as i64), null_percentage), DefaultTheme::warning()),
         ]),
         // Line::from(""),
@@ -484,7 +485,7 @@ fn draw_results_stats(f: &mut Frame, app: &App, area: Rect, active: bool) {
             Block::default()
                 .borders(Borders::ALL)
                 .border_style(border_style)
-                .title(Span::styled(" Estatísticas ", DefaultTheme::title())),
+                .title(Span::styled(format!(" {} ", t!("stats_title")), DefaultTheme::title())),
         );
 
     f.render_widget(stats_widget, area);

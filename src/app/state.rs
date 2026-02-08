@@ -11,6 +11,7 @@ use anyhow::Result;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{oneshot, RwLock};
+use rust_i18n::t;
 
 /// Cache key for columns: (schema, table_or_view)
 pub type ColumnCacheKey = (String, String);
@@ -222,6 +223,9 @@ impl App {
     pub async fn new() -> Result<Self> {
         let app_config = AppConfig::load();
         
+        // Initialize i18n locale from config or system
+        crate::init_locale(app_config.locale.as_deref());
+        
         // Try to connect to the last used connection
         let (db, show_modal, server_version) = if let Some(ref last_name) = app_config.last_connection {
             if let Some(conn_config) = app_config.get_connection(last_name) {
@@ -290,8 +294,8 @@ impl App {
             should_quit: false,
             show_help: false,
             error: None,
-            message: if is_connected { Some("Conectado ao SQL Server".to_string()) } else { None },
-            status: if is_connected { format!("Conectado | {}", server_version) } else { "Desconectado".to_string() },
+            message: if is_connected { Some(t!("connected").to_string()) } else { None },
+            status: if is_connected { format!("{} | {}", t!("connected"), server_version) } else { t!("disconnected").to_string() },
             server_version,
             command_buffer: String::new(),
             pending_scroll: 0,
@@ -334,7 +338,7 @@ impl App {
         self.db = Some(db);
         self.server_version = short_version.clone();
         self.status = format!("Conectado | {}", short_version);
-        self.message = Some(format!("Conectado a {}", config.name));
+        self.message = Some(t!("connected_to", name = config.name).to_string());
         self.show_connection_modal = false;
         
         // Update last connection and save config
@@ -489,10 +493,10 @@ impl App {
         if let Some(state) = self.undo_manager.undo(&self.query, self.cursor_pos) {
             self.query = state.text;
             self.cursor_pos = state.cursor_pos.min(self.query.len());
-            self.message = Some("Undo".to_string());
+            self.message = Some(t!("undo").to_string());
             true
         } else {
-            self.message = Some("Nada para desfazer".to_string());
+            self.message = Some(t!("nothing_to_undo").to_string());
             false
         }
     }
@@ -502,10 +506,10 @@ impl App {
         if let Some(state) = self.undo_manager.redo(&self.query, self.cursor_pos) {
             self.query = state.text;
             self.cursor_pos = state.cursor_pos.min(self.query.len());
-            self.message = Some("Redo".to_string());
+            self.message = Some(t!("redo").to_string());
             true
         } else {
-            self.message = Some("Nada para refazer".to_string());
+            self.message = Some(t!("nothing_to_redo").to_string());
             false
         }
     }

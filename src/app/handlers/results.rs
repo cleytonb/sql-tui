@@ -3,6 +3,7 @@
 use crate::app::{App, ActivePanel, ResultsTab};
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use rust_i18n::t;
 
 impl App {
     /// Results panel navigation
@@ -106,7 +107,7 @@ impl App {
                 let text = cell.to_string();
                 if let Ok(mut clipboard) = arboard::Clipboard::new() {
                     let _ = clipboard.set_text(&text);
-                    self.message = Some(format!("Copiado: {}", text));
+                    self.message = Some(t!("copied", text = text).to_string());
                 }
             }
         }
@@ -145,7 +146,7 @@ impl App {
 
             if let Ok(mut clipboard) = arboard::Clipboard::new() {
                 let _ = clipboard.set_text(&insert);
-                self.message = Some("✓ Copiado INSERT statement para clipboard".to_string());
+                self.message = Some(t!("copied_insert").to_string());
             }
         }
     }

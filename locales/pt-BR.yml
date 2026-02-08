@@ -1,0 +1,75 @@
+_version: 1
+
+# Status de conexão
+connected: "Conectado ao SQL Server"
+connected_to: "Conectado a %{name}"
+disconnected: "Desconectado"
+
+# Ações
+execute: "Executar"
+help: "Ajuda"
+
+# Editor de query
+query_placeholder: "Monte a query, CTRL+E para executar"
+
+# Resultados
+no_results: "Sem resultados ainda"
+type_query_hint: "Digite uma query e pressione "
+to_execute: " para executar"
+
+# Estatísticas
+stats_title: "Estatísticas"
+stats_header: "═══ ESTATÍSTICAS DA QUERY ═══"
+execution_time: "  Tempo de Execução:  "
+stats_rows_returned: "  Linhas Retornadas:  "
+columns: "  Colunas:  "
+total_cells: "  Total de Células:  "
+null_values: "  Valores NULL:  "
+
+# Undo/Redo
+undo: "Desfazer"
+redo: "Refazer"
+nothing_to_undo: "Nada para desfazer"
+nothing_to_redo: "Nada para refazer"
+
+# Clipboard
+yanked_chars: "Copiado %{count} caracteres"
+deleted_chars: "Deletado %{count} caracteres"
+copied: "Copiado: %{text}"
+copied_insert: "✓ Copiado INSERT statement para clipboard"
+
+# Export
+exported_rows: "✓ Exportado %{count} linhas para %{filename}"
+
+# Modal de conexão
+create_new_connection: "+ Criar nova conexão"
+select_or_create: "Selecione ou crie uma nova conexão"
+fill_required_fields: "Preencha todos os campos obrigatórios"
+
+# Labels de formulário
+field_name: "Nome"
+field_host: "Host"
+field_port: "Porta"
+field_user: "User Id"
+field_password: "Password"
+field_database: "Database"
+
+# Busca no schema
+search_prompt: " Buscar (Enter para confirmar, Esc para cancelar) "
+
+# Ajuda
+help_title: "Ajuda"
+help_header: "🏦 CRYPTONICS SQL STUDIO - AJUDA"
+help_rule: "═══ REGRA ÚNICA ═══"
+help_quote1: "Vencedores não precisam de ajuda"
+help_quote2: "\"Mais um dia para provar que o rock não morreu\" - Mel"
+
+# Execução de query
+rows_returned: "%{count} linha(s) retornada(s) em %{time}ms"
+
+# Erros
+query_error: "Erro na query: %{error}"
+connection_error: "Erro de conexão: %{error}"
+no_results_to_export: "Nenhum resultado para exportar"
+export_failed: "Falha na exportação: %{error}"
+query_interrupted: "Execução da query interrompida"

@@ -1,0 +1,75 @@
+_version: 1
+
+# Connection status
+connected: "Connected to SQL Server"
+connected_to: "Connected to %{name}"
+disconnected: "Disconnected"
+
+# Actions
+execute: "Execute"
+help: "Help"
+
+# Query editor
+query_placeholder: "Write your query, CTRL+E to execute"
+
+# Results
+no_results: "No results yet"
+type_query_hint: "Type a query and press "
+to_execute: " to execute"
+
+# Statistics
+stats_title: "Statistics"
+stats_header: "═══ QUERY STATISTICS ═══"
+execution_time: "  Execution Time:  "
+stats_rows_returned: "  Rows Returned:  "
+columns: "  Columns:  "
+total_cells: "  Total Cells:  "
+null_values: "  NULL Values:  "
+
+# Undo/Redo
+undo: "Undo"
+redo: "Redo"
+nothing_to_undo: "Nothing to undo"
+nothing_to_redo: "Nothing to redo"
+
+# Clipboard
+yanked_chars: "Yanked %{count} chars"
+deleted_chars: "Deleted %{count} chars"
+copied: "Copied: %{text}"
+copied_insert: "✓ Copied INSERT statement to clipboard"
+
+# Export
+exported_rows: "✓ Exported %{count} rows to %{filename}"
+
+# Connection modal
+create_new_connection: "+ Create new connection"
+select_or_create: "Select or create a new connection"
+fill_required_fields: "Fill in all required fields"
+
+# Form labels
+field_name: "Name"
+field_host: "Host"
+field_port: "Port"
+field_user: "User Id"
+field_password: "Password"
+field_database: "Database"
+
+# Schema search
+search_prompt: " Search (Enter to confirm, Esc to cancel) "
+
+# Help
+help_title: "Help"
+help_header: "🏦 CRYPTONICS SQL STUDIO - HELP"
+help_rule: "═══ THE ONLY RULE ═══"
+help_quote1: "Winners don't need help"
+help_quote2: "\"Another day to prove rock isn't dead\" - Mel"
+
+# Query execution
+rows_returned: "%{count} row(s) returned in %{time}ms"
+
+# Errors
+query_error: "Query error: %{error}"
+connection_error: "Connection error: %{error}"
+no_results_to_export: "No results to export"
+export_failed: "Export failed: %{error}"
+query_interrupted: "Query execution interrupted"

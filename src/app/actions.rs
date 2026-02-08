@@ -11,6 +11,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::oneshot;
 use tokio::sync::Mutex;
+use rust_i18n::t;
 
 impl App {
     /// Execute the default query on startup
@@ -35,11 +36,11 @@ impl App {
                     database,
                 );
 
-                self.message = Some(format!(
-                    "{} linha(s) retornada(s) em {:.2}ms",
-                    row_count,
-                    result.execution_time.as_secs_f64() * 1000.0
-                ));
+                self.message = Some(t!(
+                    "rows_returned",
+                    count = row_count,
+                    time = format!("{:.2}", result.execution_time.as_secs_f64() * 1000.0)
+                ).to_string());
 
                 self.result = result;
                 self.results_selected = 0;
@@ -278,11 +279,11 @@ impl App {
                                 );
                             }
 
-                            self.message = Some(format!(
-                                "{} linha(s) retornada(s) em {:.2}ms",
-                                row_count,
-                                query_result.execution_time.as_secs_f64() * 1000.0
-                            ));
+                            self.message = Some(t!(
+                                "rows_returned",
+                                count = row_count,
+                                time = format!("{:.2}", query_result.execution_time.as_secs_f64() * 1000.0)
+                            ).to_string());
 
                             self.result = query_result;
                             self.results_scroll = 0;
@@ -302,7 +303,7 @@ impl App {
                 }
                 Err(oneshot::error::TryRecvError::Closed) => {
                     // Channel closed unexpectedly
-                    self.error = Some("Execução da query interrompida".to_string());
+                    self.error = Some(t!("query_interrupted").to_string());
                     self.is_loading = false;
                     self.pending_query = None;
                     self.pending_query_text = None;

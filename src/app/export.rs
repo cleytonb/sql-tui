@@ -2,12 +2,13 @@
 
 use crate::app::App;
 use anyhow::Result;
+use rust_i18n::t;
 
 impl App {
     /// Export results to CSV file
     pub fn export_results_csv(&mut self) {
         if self.result.rows.is_empty() {
-            self.error = Some("Nenhum resultado para exportar".to_string());
+            self.error = Some(t!("no_results_to_export").to_string());
             return;
         }
 
@@ -16,10 +17,10 @@ impl App {
 
         match self.export_csv(&filename) {
             Ok(()) => {
-                self.message = Some(format!("✓ Exportado {} linhas para {}", self.result.rows.len(), filename));
+                self.message = Some(t!("exported_rows", count = self.result.rows.len(), filename = filename).to_string());
             }
             Err(e) => {
-                self.error = Some(format!("Falha na exportação: {}", e));
+                self.error = Some(t!("export_failed", error = e.to_string()).to_string());
             }
         }
     }
@@ -27,7 +28,7 @@ impl App {
     /// Export results to JSON file
     pub fn export_results_json(&mut self) {
         if self.result.rows.is_empty() {
-            self.error = Some("Nenhum resultado para exportar".to_string());
+            self.error = Some(t!("no_results_to_export").to_string());
             return;
         }
 
@@ -36,10 +37,10 @@ impl App {
 
         match self.export_json(&filename) {
             Ok(()) => {
-                self.message = Some(format!("✓ Exportado {} linhas para {}", self.result.rows.len(), filename));
+                self.message = Some(t!("exported_rows", count = self.result.rows.len(), filename = filename).to_string());
             }
             Err(e) => {
-                self.error = Some(format!("Falha na exportação: {}", e));
+                self.error = Some(t!("export_failed", error = e.to_string()).to_string());
             }
         }
     }

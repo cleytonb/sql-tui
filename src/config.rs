@@ -50,6 +50,9 @@ pub struct AppConfig {
     pub connections: Vec<ConnectionConfig>,
     /// Name of the last used connection (for auto-connect)
     pub last_connection: Option<String>,
+    /// Locale override (e.g., "pt-BR", "en"). If None, uses system locale
+    #[serde(default)]
+    pub locale: Option<String>,
 }
 
 impl AppConfig {

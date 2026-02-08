@@ -4,6 +4,7 @@ use crate::app::{App, SchemaNodeType};
 use crate::ui::DefaultTheme;
 use ratatui::prelude::*;
 use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph};
+use rust_i18n::t;
 
 /// Draw the schema explorer panel
 pub fn draw_schema_explorer(f: &mut Frame, app: &mut App, area: Rect, active: bool) {
@@ -44,7 +45,7 @@ pub fn draw_schema_explorer(f: &mut Frame, app: &mut App, area: Rect, active: bo
             Block::default()
                 .borders(Borders::ALL)
                 .border_style(Style::default().fg(DefaultTheme::PRIMARY))
-                .title(Span::styled(" Search (Enter to confirm, Esc to cancel) ", DefaultTheme::info())),
+                .title(Span::styled(t!("search_prompt").to_string(), DefaultTheme::info())),
         );
         f.render_widget(search_input, search_area);
     }

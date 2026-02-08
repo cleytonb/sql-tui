@@ -4,6 +4,7 @@ use crate::app::{App, ActivePanel, SPINNER_FRAMES};
 use crate::ui::{DefaultTheme, draw_query_editor, draw_results_table, draw_schema_explorer, draw_history_panel, draw_completion_popup};
 use ratatui::prelude::*;
 use ratatui::widgets::{Block, Borders, Paragraph, Clear};
+use rust_i18n::t;
 
 /// Draw the main layout
 pub fn draw_layout(f: &mut Frame, app: &mut App, area: Rect) {
@@ -74,7 +75,7 @@ fn draw_header(f: &mut Frame, app: &App, area: Rect) {
             Line::from(""),
             Line::from(vec![
                 Span::styled("○ ", DefaultTheme::dim_text()),
-                Span::styled("Desconectado", DefaultTheme::dim_text()),
+                Span::styled(t!("disconnected").to_string(), DefaultTheme::dim_text()),
             ]),
             Line::from(""),
         ])
@@ -87,9 +88,9 @@ fn draw_header(f: &mut Frame, app: &App, area: Rect) {
         Line::from(""),
         Line::from(vec![
             Span::styled("Ctrl+E", DefaultTheme::info()),
-            Span::styled(":Executar ", DefaultTheme::dim_text()),
+            Span::styled(format!(":{} ", t!("execute")), DefaultTheme::dim_text()),
             Span::styled("F1", DefaultTheme::info()),
-            Span::styled(":Ajuda ", DefaultTheme::dim_text()),
+            Span::styled(format!(":{} ", t!("help")), DefaultTheme::dim_text()),
         ]),
         Line::from(""),
     ])
@@ -172,7 +173,7 @@ fn draw_status_bar(f: &mut Frame, app: &App, area: Rect) {
             DefaultTheme::warning(),
         ))
     } else {
-        Paragraph::new(Span::styled("Monte a query, CTRL+E para executar", DefaultTheme::dim_text()))
+        Paragraph::new(Span::styled(t!("query_placeholder").to_string(), DefaultTheme::dim_text()))
     };
 
     f.render_widget(message.style(DefaultTheme::status_bar()), chunks[0]);
@@ -196,14 +197,14 @@ pub fn draw_help_popup(f: &mut Frame, area: Rect) {
     f.render_widget(Clear, popup_area);
 
     let help_text = vec![
-        Line::from(Span::styled("🏦 CRYPTONICS SQL STUDIO - AJUDA", DefaultTheme::title())),
+        Line::from(Span::styled(t!("help_header").to_string(), DefaultTheme::title())),
         Line::from(""),
-        Line::from(Span::styled("═══ REGRA ÚNICA ═══", DefaultTheme::info())),
+        Line::from(Span::styled(t!("help_rule").to_string(), DefaultTheme::info())),
         Line::from(""),
-        Line::from("Vencedores não precisam de ajuda"),
+        Line::from(t!("help_quote1").to_string()),
         Line::from(""),
         Line::from(""),
-        Line::from("\"Mais um dia para provar que o rock não morreu\" - Mel")
+        Line::from(t!("help_quote2").to_string())
     ];
 
     let help = Paragraph::new(help_text)
@@ -211,7 +212,7 @@ pub fn draw_help_popup(f: &mut Frame, area: Rect) {
             Block::default()
                 .borders(Borders::ALL)
                 .border_style(DefaultTheme::popup_border())
-                .title(Span::styled(" Ajuda ", DefaultTheme::title()))
+                .title(Span::styled(format!(" {} ", t!("help_title")), DefaultTheme::title()))
                 .style(DefaultTheme::popup()),
         )
         .wrap(ratatui::widgets::Wrap { trim: false });

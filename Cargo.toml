@@ -41,6 +41,10 @@ anyhow = "1.0"
 # Clipboard
 arboard = "3.4"
 
+# Internationalization
+rust-i18n = "3"
+sys-locale = "0.3"
+
 # CSV export
 csv = "1.3"
 

@@ -8,6 +8,7 @@ use crate::config::ConnectionForm;
 use crate::ui::DefaultTheme;
 use ratatui::prelude::*;
 use ratatui::widgets::{Block, Borders, Clear, List, ListItem, Paragraph};
+use rust_i18n::t;
 
 /// Draw the connection modal
 pub fn draw_connection_modal(f: &mut Frame, app: &App, area: Rect) {
@@ -108,7 +109,7 @@ fn draw_connection_list(f: &mut Frame, app: &App, area: Rect) {
     
     items.push(ListItem::new(Line::from(vec![
         Span::styled(create_prefix, create_style),
-        Span::styled("+ Criar nova conexão", create_style),
+        Span::styled(t!("create_new_connection").to_string(), create_style),
     ])));
 
     let list = List::new(items);
@@ -132,7 +133,7 @@ fn draw_connection_form(f: &mut Frame, app: &App, area: Rect) {
             Line::from(""),
             Line::from(""),
             Line::from(Span::styled(
-                "Selecione ou crie uma nova conexão",
+                t!("select_or_create").to_string(),
                 DefaultTheme::dim_text(),
             )),
         ])
@@ -182,7 +183,7 @@ fn draw_connection_form(f: &mut Frame, app: &App, area: Rect) {
     
     // If the form is not valid, show the hint text
     if !form.is_valid() {
-        let hint_text = "Preencha todos os campos obrigatórios";
+        let hint_text = t!("fill_required_fields").to_string();
 
         let hint = Paragraph::new(Line::from(vec![
             Span::styled("  ", Style::default()),

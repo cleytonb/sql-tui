@@ -4,6 +4,7 @@ use crate::app::{App, InputMode};
 use crate::completion::{extract_context, get_candidates, get_candidates_with_columns};
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use rust_i18n::t;
 
 impl App {
     /// Get the indentation (leading whitespace) of the current line
@@ -101,6 +102,7 @@ impl App {
         }
 
         match key.code {
+            // Enter or Ctrl+J (Shift+Enter in iTerm2 sends Ctrl+J)
             KeyCode::Enter => {
                 self.completion.hide();
                 self.save_undo_state();
@@ -108,6 +110,18 @@ impl App {
                 self.query.insert(self.cursor_pos, '\n');
                 self.cursor_pos += 1;
                 // Insert the same indentation on the new line
+                for c in indent.chars() {
+                    self.query.insert(self.cursor_pos, c);
+                    self.cursor_pos += 1;
+                }
+            }
+            // Ctrl+J = Line Feed (Shift+Enter in some terminals like iTerm2)
+            KeyCode::Char('j') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                self.completion.hide();
+                self.save_undo_state();
+                let indent = self.get_current_line_indent();
+                self.query.insert(self.cursor_pos, '\n');
+                self.cursor_pos += 1;
                 for c in indent.chars() {
                     self.query.insert(self.cursor_pos, c);
                     self.cursor_pos += 1;
@@ -729,7 +743,7 @@ impl App {
                 if let Some(text) = self.yank_selection() {
                     if let Ok(mut clipboard) = arboard::Clipboard::new() {
                         let _ = clipboard.set_text(&text);
-                        self.message = Some(format!("Yanked {} chars", text.len()));
+                        self.message = Some(t!("yanked_chars", count = text.len()).to_string());
                     }
                 }
             }
@@ -741,7 +755,7 @@ impl App {
                     let _ = clipboard.set_text(&text);
                 }
                 self.delete_selection();
-                self.message = Some(format!("Deleted {} chars", text.len()));
+                self.message = Some(t!("deleted_chars", count = text.len()).to_string());
             }
             // Change (delete and enter insert mode)
             KeyCode::Char('c') => {

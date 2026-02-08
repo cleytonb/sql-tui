@@ -4,6 +4,7 @@ use crate::app::{App, ConnectionModalFocus};
 use crate::config::ConnectionForm;
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use rust_i18n::t;
 
 impl App {
     /// Handle keyboard input for the connection modal
@@ -55,10 +56,10 @@ impl App {
                     match self.connect(&conn).await {
                         Ok(_) => {
                             // Connection successful, modal will close
-                            self.message = Some(format!("Conectado a {}", conn.name));
+                            self.message = Some(t!("connected_to", name = conn.name).to_string());
                         }
                         Err(e) => {
-                            self.error = Some(format!("Erro ao conectar: {}", e));
+                            self.error = Some(t!("connection_error", error = e.to_string()).to_string());
                         }
                     }
                 }
@@ -74,11 +75,11 @@ impl App {
                     match self.connect(&config).await {
                         Ok(_) => {
                             // Connection successful, modal will close
-                            self.message = Some(format!("Conectado a {}", config.name));
+                            self.message = Some(t!("connected_to", name = config.name).to_string());
                             self.connection_modal_focus = ConnectionModalFocus::List;
                         }
                         Err(e) => {
-                            self.error = Some(format!("Erro ao conectar: {}", e));
+                            self.error = Some(t!("connection_error", error = e.to_string()).to_string());
                         }
                     }
                 }
