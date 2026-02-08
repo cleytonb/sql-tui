@@ -20,11 +20,11 @@ to_execute: " para executar"
 # Estatísticas
 stats_title: "Estatísticas"
 stats_header: "═══ ESTATÍSTICAS DA QUERY ═══"
-execution_time: "  Tempo de Execução:  "
-stats_rows_returned: "  Linhas Retornadas:  "
-columns: "  Colunas:  "
-total_cells: "  Total de Células:  "
-null_values: "  Valores NULL:  "
+execution_time: "Tempo de Execução:"
+stats_rows_returned: "Linhas Retornadas:"
+columns: "Colunas:"
+total_cells: "Total de Células:"
+null_values: "Valores NULL:"
 
 # Undo/Redo
 undo: "Desfazer"

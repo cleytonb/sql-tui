@@ -20,11 +20,11 @@ to_execute: " to execute"
 # Statistics
 stats_title: "Statistics"
 stats_header: "═══ QUERY STATISTICS ═══"
-execution_time: "  Execution Time:  "
-stats_rows_returned: "  Rows Returned:  "
-columns: "  Columns:  "
-total_cells: "  Total Cells:  "
-null_values: "  NULL Values:  "
+execution_time: "Execution Time:"
+stats_rows_returned: "Rows Returned:"
+columns: "Columns:"
+total_cells: "Total Cells:"
+null_values: "NULL Values:"
 
 # Undo/Redo
 undo: "Undo"

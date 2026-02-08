@@ -101,8 +101,8 @@ fn draw_results_tabs(f: &mut Frame, app: &App, area: Rect, active: bool) {
     }
 
     let tabs_line = Line::from(spans);
-    let tabs_widget = Paragraph::new(tabs_line)
-        .style(Style::default().bg(DefaultTheme::BG_PANEL));
+    let tabs_widget = Paragraph::new(tabs_line);
+        // .style(Style::default().bg(DefaultTheme::BG_PANEL));
     f.render_widget(tabs_widget, area);
 }
 
@@ -229,8 +229,8 @@ fn draw_results_data(f: &mut Frame, app: &mut App, area: Rect, active: bool) {
                             DefaultTheme::highlighted()
                         } else if is_null {
                             DefaultTheme::null_value()
-                        } else if row_idx % 2 == 1 {
-                            DefaultTheme::table_row_alt()
+                        // } else if row_idx % 2 == 1 {
+                            // DefaultTheme::table_row_alt()
                         } else {
                             DefaultTheme::normal_text()
                         };
@@ -417,29 +417,43 @@ fn draw_results_stats(f: &mut Frame, app: &App, area: Rect, active: bool) {
         0.0
     };
 
-    // Build stats text
+    // Build stats text with aligned labels
+    let labels = [
+        t!("execution_time").to_string(),
+        t!("stats_rows_returned").to_string(),
+        t!("columns").to_string(),
+        t!("total_cells").to_string(),
+        t!("null_values").to_string(),
+    ];
+    let max_label_len = labels.iter().map(|l| l.trim().len()).max().unwrap_or(0);
+
+    let pad_label = |label: &str| -> String {
+        let trimmed = label.trim();
+        format!("  {:<width$}  ", trimmed, width = max_label_len)
+    };
+
     let stats_lines: Vec<Line> = vec![
         Line::from(""),
         Line::from(Span::styled(t!("stats_header").to_string(), DefaultTheme::info())),
         Line::from(""),
         Line::from(vec![
-            Span::styled(t!("execution_time").to_string(), DefaultTheme::dim_text()),
+            Span::styled(pad_label(&labels[0]), DefaultTheme::dim_text()),
             Span::styled(format!("{:.2} ms", exec_ms), DefaultTheme::success()),
         ]),
         Line::from(vec![
-            Span::styled(t!("rows_returned").to_string(), DefaultTheme::dim_text()),
+            Span::styled(pad_label(&labels[1]), DefaultTheme::dim_text()),
             Span::styled(format_number(app.result.row_count as i64), DefaultTheme::info()),
         ]),
         Line::from(vec![
-            Span::styled(t!("columns").to_string(), DefaultTheme::dim_text()),
+            Span::styled(pad_label(&labels[2]), DefaultTheme::dim_text()),
             Span::styled(format!("{}", app.result.columns.len()), DefaultTheme::info()),
         ]),
         Line::from(vec![
-            Span::styled(t!("total_cells").to_string(), DefaultTheme::dim_text()),
+            Span::styled(pad_label(&labels[3]), DefaultTheme::dim_text()),
             Span::styled(format_number(total_cells as i64), DefaultTheme::normal_text()),
         ]),
         Line::from(vec![
-            Span::styled(t!("null_values").to_string(), DefaultTheme::dim_text()),
+            Span::styled(pad_label(&labels[4]), DefaultTheme::dim_text()),
             Span::styled(format!("{} ({:.1}%)", format_number(null_count as i64), null_percentage), DefaultTheme::warning()),
         ]),
         // Line::from(""),
