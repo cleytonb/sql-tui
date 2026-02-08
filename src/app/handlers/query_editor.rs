@@ -86,12 +86,17 @@ impl App {
                 self.query.insert(self.cursor_pos, '\n');
                 self.cursor_pos += 1;
             }
-            // Tab = trigger completion OR insert 4 spaces
+            // Tab = accept completion OR insert 4 spaces
             KeyCode::Tab => {
                 if self.completion.visible {
                     self.accept_completion();
                 } else {
-                    self.trigger_completion();
+                    // Insert 4 spaces for indentation
+                    self.save_undo_state();
+                    for _ in 0..4 {
+                        self.query.insert(self.cursor_pos, ' ');
+                        self.cursor_pos += 1;
+                    }
                 }
             }
             // Ctrl+Space = force trigger completion

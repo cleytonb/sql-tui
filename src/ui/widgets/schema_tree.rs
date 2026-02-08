@@ -3,7 +3,7 @@
 use crate::app::{App, SchemaNodeType};
 use crate::ui::DefaultTheme;
 use ratatui::prelude::*;
-use ratatui::widgets::{Block, Borders, List, ListItem, Paragraph};
+use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph};
 
 /// Draw the schema explorer panel
 pub fn draw_schema_explorer(f: &mut Frame, app: &App, area: Rect, active: bool) {
@@ -114,7 +114,9 @@ pub fn draw_schema_explorer(f: &mut Frame, app: &App, area: Rect, active: bool) 
         )
         .highlight_style(DefaultTheme::selected());
 
-    f.render_widget(list, list_area);
+    // Usa ListState para controlar o scroll automaticamente
+    let mut list_state = ListState::default().with_selected(Some(app.schema_selected));
+    f.render_stateful_widget(list, list_area, &mut list_state);
 }
 
 /// Highlight matching text in search results
