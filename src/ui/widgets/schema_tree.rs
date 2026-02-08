@@ -6,7 +6,7 @@ use ratatui::prelude::*;
 use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph};
 
 /// Draw the schema explorer panel
-pub fn draw_schema_explorer(f: &mut Frame, app: &App, area: Rect, active: bool) {
+pub fn draw_schema_explorer(f: &mut Frame, app: &mut App, area: Rect, active: bool) {
     let border_style = if active {
         DefaultTheme::active_border()
     } else {
@@ -114,8 +114,23 @@ pub fn draw_schema_explorer(f: &mut Frame, app: &App, area: Rect, active: bool) 
         )
         .highlight_style(DefaultTheme::selected());
 
-    // Usa ListState para controlar o scroll automaticamente
-    let mut list_state = ListState::default().with_selected(Some(app.schema_selected));
+    // Calcula a altura visível (área - bordas)
+    let visible_height = list_area.height.saturating_sub(2) as usize;
+    
+    // Ajusta o offset de scroll para manter o item selecionado visível
+    // Só scrolla quando necessário (item sai da área visível)
+    if app.schema_selected < app.schema_scroll_offset {
+        // Item está acima da área visível - scrolla para cima
+        app.schema_scroll_offset = app.schema_selected;
+    } else if app.schema_selected >= app.schema_scroll_offset + visible_height {
+        // Item está abaixo da área visível - scrolla para baixo
+        app.schema_scroll_offset = app.schema_selected.saturating_sub(visible_height.saturating_sub(1));
+    }
+
+    // Usa ListState com o offset persistido
+    let mut list_state = ListState::default()
+        .with_selected(Some(app.schema_selected))
+        .with_offset(app.schema_scroll_offset);
     f.render_stateful_widget(list, list_area, &mut list_state);
 }
 

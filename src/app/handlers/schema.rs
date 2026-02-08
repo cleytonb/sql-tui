@@ -2,7 +2,7 @@
 
 use crate::app::{App, ActivePanel, SchemaNodeType};
 use anyhow::Result;
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 impl App {
     /// Schema explorer handler
@@ -14,6 +14,7 @@ impl App {
                     self.show_search_schema = false;
                     self.schema_search_query.clear();
                     self.schema_selected = 0;
+                    self.schema_scroll_offset = 0;
                 }
                 KeyCode::Enter => {
                     self.show_search_schema = false;
@@ -22,10 +23,12 @@ impl App {
                 KeyCode::Backspace => {
                     self.schema_search_query.pop();
                     self.schema_selected = 0;
+                    self.schema_scroll_offset = 0;
                 }
                 KeyCode::Char(c) => {
                     self.schema_search_query.push(c);
                     self.schema_selected = 0;
+                    self.schema_scroll_offset = 0;
                 }
                 KeyCode::Up | KeyCode::Down => {
                     // Allow navigation even during search
@@ -50,6 +53,16 @@ impl App {
                 if self.schema_selected < max {
                     self.schema_selected += 1;
                 }
+            }
+            // Ctrl+D = Smooth scroll down
+            KeyCode::Char('d') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                self.pending_scroll += 10;
+                return Ok(());
+            }
+            // Ctrl+U = Smooth scroll up
+            KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                self.pending_scroll -= 10;
+                return Ok(());
             }
             // Fetch source
             KeyCode::Char('s') => {
@@ -77,6 +90,7 @@ impl App {
                 if !self.schema_search_query.is_empty() {
                     self.schema_search_query.clear();
                     self.schema_selected = 0;
+                    self.schema_scroll_offset = 0;
                 } else {
                     self.active_panel = ActivePanel::QueryEditor;
                 }

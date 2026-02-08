@@ -173,6 +173,8 @@ pub struct App {
     pub schema_tree: Vec<SchemaNode>,
     /// Selected index in schema tree
     pub schema_selected: usize,
+    /// Scroll offset for schema tree (for proper scroll behavior)
+    pub schema_scroll_offset: usize,
     /// Show search input in schema explorer
     pub show_search_schema: bool,
     /// Search query for schema explorer
@@ -275,6 +277,7 @@ impl App {
             results_tab: ResultsTab::Data,
             schema_tree: Vec::new(),
             schema_selected: 0,
+            schema_scroll_offset: 0,
             show_search_schema: false,
             schema_search_query: String::new(),
             column_cache: Arc::new(RwLock::new(HashMap::new())),
