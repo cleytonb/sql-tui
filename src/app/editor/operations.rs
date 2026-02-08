@@ -4,113 +4,137 @@
 //! implementing vim-style operations like delete, yank, change, etc.
 
 use super::motions;
+use crate::app::App;
+
+/// Helper to convert char index to byte index
+fn c2b(s: &str, char_idx: usize) -> usize {
+    App::char_to_byte_index(s, char_idx)
+}
 
 /// Delete a line from the text, returning the deleted content
+/// cursor_pos is a char index
 pub fn delete_line(text: &mut String, cursor_pos: usize) -> (String, usize) {
     let line_start = motions::line_start(text, cursor_pos);
     let mut line_end = motions::line_end(text, cursor_pos);
-    
+
     // Include the newline if present
-    if line_end < text.len() {
+    let char_count = text.chars().count();
+    if line_end < char_count {
         line_end += 1;
     }
-    
+
     let deleted: String = text.chars().skip(line_start).take(line_end - line_start).collect();
-    text.drain(line_start..line_end);
-    
-    let new_cursor = line_start.min(text.len().saturating_sub(1));
+    let byte_start = c2b(text, line_start);
+    let byte_end = c2b(text, line_end);
+    text.drain(byte_start..byte_end);
+
+    let new_cursor = line_start.min(text.chars().count().saturating_sub(1));
     (deleted, new_cursor)
 }
 
-/// Delete a character at the given position
+/// Delete a character at the given position (char index)
 pub fn delete_char(text: &mut String, cursor_pos: usize) -> Option<char> {
-    if cursor_pos < text.len() {
-        Some(text.remove(cursor_pos))
+    if cursor_pos < text.chars().count() {
+        Some(text.remove(c2b(text, cursor_pos)))
     } else {
         None
     }
 }
 
-/// Delete a range of text, returning the deleted content
+/// Delete a range of text (char indices), returning the deleted content
 pub fn delete_range(text: &mut String, start: usize, end: usize) -> String {
-    let end_inclusive = (end + 1).min(text.len());
+    let char_count = text.chars().count();
+    let end_inclusive = (end + 1).min(char_count);
     let deleted: String = text.chars().skip(start).take(end_inclusive - start).collect();
-    text.drain(start..end_inclusive);
+    let byte_start = c2b(text, start);
+    let byte_end = c2b(text, end_inclusive);
+    text.drain(byte_start..byte_end);
     deleted
 }
 
-/// Yank (copy) a range of text
+/// Yank (copy) a range of text (char indices)
 pub fn yank_range(text: &str, start: usize, end: usize) -> String {
-    let end_inclusive = (end + 1).min(text.len());
+    let char_count = text.chars().count();
+    let end_inclusive = (end + 1).min(char_count);
     text.chars().skip(start).take(end_inclusive - start).collect()
 }
 
-/// Yank the current line
+/// Yank the current line (cursor_pos is char index)
 pub fn yank_line(text: &str, cursor_pos: usize) -> String {
     let line_start = motions::line_start(text, cursor_pos);
     let mut line_end = motions::line_end(text, cursor_pos);
-    
+
     // Include the newline if present
-    if line_end < text.len() {
+    let char_count = text.chars().count();
+    if line_end < char_count {
         line_end += 1;
     }
-    
+
     text.chars().skip(line_start).take(line_end - line_start).collect()
 }
 
-/// Insert text at the given position
+/// Insert text at the given position (char index)
 pub fn insert_text(text: &mut String, pos: usize, content: &str) -> usize {
-    for (i, c) in content.chars().enumerate() {
-        text.insert(pos + i, c);
-    }
-    pos + content.len()
+    let byte_pos = c2b(text, pos);
+    text.insert_str(byte_pos, content);
+    pos + content.chars().count()
 }
 
-/// Replace a character at the given position
+/// Replace a character at the given position (char index)
 pub fn replace_char(text: &mut String, cursor_pos: usize, new_char: char) {
-    if cursor_pos < text.len() {
-        text.remove(cursor_pos);
-        text.insert(cursor_pos, new_char);
+    if cursor_pos < text.chars().count() {
+        let byte_pos = c2b(text, cursor_pos);
+        text.remove(byte_pos);
+        text.insert(byte_pos, new_char);
     }
 }
 
-/// Join the current line with the next line
+/// Join the current line with the next line (cursor_pos is char index)
 pub fn join_lines(text: &mut String, cursor_pos: usize) -> usize {
     let line_end = motions::line_end(text, cursor_pos);
-    
-    if line_end < text.len() {
+
+    let char_count = text.chars().count();
+    if line_end < char_count {
         // Remove the newline
-        text.remove(line_end);
+        let byte_pos = c2b(text, line_end);
+        text.remove(byte_pos);
         // Insert a space if needed
-        if line_end < text.len() && !text.chars().nth(line_end).unwrap().is_whitespace() {
-            text.insert(line_end, ' ');
+        if line_end < text.chars().count() && !text.chars().nth(line_end).unwrap().is_whitespace() {
+            text.insert(c2b(text, line_end), ' ');
         }
     }
-    
+
     cursor_pos
 }
 
-/// Delete from cursor to end of line (D command)
+/// Delete from cursor to end of line (D command) (char indices)
 pub fn delete_to_line_end(text: &mut String, cursor_pos: usize) -> String {
     let line_end = motions::line_end(text, cursor_pos);
     let deleted: String = text.chars().skip(cursor_pos).take(line_end - cursor_pos).collect();
-    text.drain(cursor_pos..line_end);
+    let byte_start = c2b(text, cursor_pos);
+    let byte_end = c2b(text, line_end);
+    text.drain(byte_start..byte_end);
     deleted
 }
 
-/// Delete from cursor to start of line
+/// Delete from cursor to start of line (char indices)
 pub fn delete_to_line_start(text: &mut String, cursor_pos: usize) -> String {
     let line_start = motions::line_start(text, cursor_pos);
     let deleted: String = text.chars().skip(line_start).take(cursor_pos - line_start).collect();
-    text.drain(line_start..cursor_pos);
+    let byte_start = c2b(text, line_start);
+    let byte_end = c2b(text, cursor_pos);
+    text.drain(byte_start..byte_end);
     deleted
 }
 
-/// Change (delete and return new cursor position for insert mode)
+/// Change (delete and return new cursor position for insert mode) (char indices)
 pub fn change_range(text: &mut String, start: usize, end: usize) -> usize {
-    let end_inclusive = (end + 1).min(text.len());
-    text.drain(start..end_inclusive);
-    start.min(text.len())
+    let char_count = text.chars().count();
+    let end_inclusive = (end + 1).min(char_count);
+    let byte_start = c2b(text, start);
+    let byte_end = c2b(text, end_inclusive);
+    text.drain(byte_start..byte_end);
+    start.min(text.chars().count())
 }
 
 #[cfg(test)]

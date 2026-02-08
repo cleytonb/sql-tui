@@ -369,6 +369,22 @@ impl App {
         self.app_config.connections.get(self.connection_list_selected)
     }
 
+    // === UTF-8 Helpers ===
+
+    /// Convert a char index to a byte index in the given string.
+    /// If char_idx is beyond the string length, returns s.len().
+    pub fn char_to_byte_index(s: &str, char_idx: usize) -> usize {
+        s.char_indices()
+            .nth(char_idx)
+            .map(|(byte_idx, _)| byte_idx)
+            .unwrap_or(s.len())
+    }
+
+    /// Get the byte index corresponding to self.cursor_pos in self.query
+    pub fn query_byte_pos(&self) -> usize {
+        Self::char_to_byte_index(&self.query, self.cursor_pos)
+    }
+
     // === Query State Helpers ===
 
     /// Get cursor line and column
@@ -494,7 +510,7 @@ impl App {
     pub fn undo(&mut self) -> bool {
         if let Some(state) = self.undo_manager.undo(&self.query, self.cursor_pos) {
             self.query = state.text;
-            self.cursor_pos = state.cursor_pos.min(self.query.len());
+            self.cursor_pos = state.cursor_pos.min(self.query.chars().count());
             self.message = Some(t!("undo").to_string());
             true
         } else {
@@ -507,7 +523,7 @@ impl App {
     pub fn redo(&mut self) -> bool {
         if let Some(state) = self.undo_manager.redo(&self.query, self.cursor_pos) {
             self.query = state.text;
-            self.cursor_pos = state.cursor_pos.min(self.query.len());
+            self.cursor_pos = state.cursor_pos.min(self.query.chars().count());
             self.message = Some(t!("redo").to_string());
             true
         } else {

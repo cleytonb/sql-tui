@@ -334,8 +334,8 @@ impl App {
                     node.name.clone()
                 };
                 let insert_text = format!("[{}]", full_name);
-                self.query.insert_str(self.cursor_pos, &insert_text);
-                self.cursor_pos += insert_text.len();
+                self.query.insert_str(self.query_byte_pos(), &insert_text);
+                self.cursor_pos += insert_text.chars().count();
                 self.active_panel = ActivePanel::QueryEditor;
             }
             else if node.node_type == SchemaNodeType::Procedure {
@@ -361,7 +361,7 @@ impl App {
         if let Some(query) = entry_query {
             self.save_undo_state();
             self.query = query;
-            self.cursor_pos = self.query.len();
+            self.cursor_pos = self.query.chars().count();
             self.active_panel = ActivePanel::QueryEditor;
         }
     }
@@ -371,7 +371,7 @@ impl App {
         self.save_undo_state();
         let formatted = format_sql_query(&self.query);
         self.query = formatted;
-        self.cursor_pos = self.query.len();
+        self.cursor_pos = self.query.chars().count();
         self.query_scroll_x = 0;
         self.query_scroll_y = 0;
     }
@@ -379,9 +379,12 @@ impl App {
     /// Delete selected text in visual mode
     pub fn delete_selection(&mut self) {
         let (start, end) = self.get_visual_selection();
-        let end_inclusive = (end + 1).min(self.query.len());
-        self.query.drain(start..end_inclusive);
-        self.cursor_pos = start.min(self.query.len().saturating_sub(1));
+        let char_count = self.query.chars().count();
+        let end_inclusive = (end + 1).min(char_count);
+        let byte_start = Self::char_to_byte_index(&self.query, start);
+        let byte_end = Self::char_to_byte_index(&self.query, end_inclusive);
+        self.query.drain(byte_start..byte_end);
+        self.cursor_pos = start.min(self.query.chars().count().saturating_sub(1));
         self.input_mode = InputMode::Normal;
     }
 

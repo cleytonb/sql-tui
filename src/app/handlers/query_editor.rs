@@ -7,15 +7,21 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use rust_i18n::t;
 
 impl App {
+    /// Get the char index of the start of the current line
+    fn current_line_start_char(&self) -> usize {
+        let chars: Vec<char> = self.query.chars().collect();
+        for i in (0..self.cursor_pos).rev() {
+            if chars[i] == '\n' {
+                return i + 1;
+            }
+        }
+        0
+    }
+
     /// Get the indentation (leading whitespace) of the current line
     fn get_current_line_indent(&self) -> String {
-        let text_before: String = self.query.chars().take(self.cursor_pos).collect();
-        let line_start = if let Some(last_newline) = text_before.rfind('\n') {
-            last_newline + 1
-        } else {
-            0
-        };
-        
+        let line_start = self.current_line_start_char();
+
         // Extract leading whitespace from current line
         let mut indent = String::new();
         for c in self.query.chars().skip(line_start) {
@@ -30,13 +36,8 @@ impl App {
 
     /// Get the current line text (before cursor, from line start)
     fn get_current_line_text(&self) -> String {
-        let text_before: String = self.query.chars().take(self.cursor_pos).collect();
-        let line_start = if let Some(last_newline) = text_before.rfind('\n') {
-            last_newline + 1
-        } else {
-            0
-        };
-        text_before[line_start..].to_string()
+        let line_start = self.current_line_start_char();
+        self.query.chars().skip(line_start).take(self.cursor_pos - line_start).collect()
     }
 
     /// Insert newline with auto-indentation and BEGIN/END autoclose
@@ -55,12 +56,12 @@ impl App {
             let inner_indent = format!("{}    ", indent);
 
             // Two newlines + inner indent (cursor line)
-            self.query.insert(self.cursor_pos, '\n');
+            self.query.insert(self.query_byte_pos(), '\n');
             self.cursor_pos += 1;
-            self.query.insert(self.cursor_pos, '\n');
+            self.query.insert(self.query_byte_pos(), '\n');
             self.cursor_pos += 1;
             for c in inner_indent.chars() {
-                self.query.insert(self.cursor_pos, c);
+                self.query.insert(self.query_byte_pos(), c);
                 self.cursor_pos += 1;
             }
 
@@ -68,16 +69,16 @@ impl App {
             let cursor_final = self.cursor_pos;
 
             // Two newlines + original indent + END
-            self.query.insert(self.cursor_pos, '\n');
+            self.query.insert(self.query_byte_pos(), '\n');
             self.cursor_pos += 1;
-            self.query.insert(self.cursor_pos, '\n');
+            self.query.insert(self.query_byte_pos(), '\n');
             self.cursor_pos += 1;
             for c in indent.chars() {
-                self.query.insert(self.cursor_pos, c);
+                self.query.insert(self.query_byte_pos(), c);
                 self.cursor_pos += 1;
             }
             for c in "END".chars() {
-                self.query.insert(self.cursor_pos, c);
+                self.query.insert(self.query_byte_pos(), c);
                 self.cursor_pos += 1;
             }
 
@@ -85,10 +86,10 @@ impl App {
             self.cursor_pos = cursor_final;
         } else {
             // Normal newline with auto-indent
-            self.query.insert(self.cursor_pos, '\n');
+            self.query.insert(self.query_byte_pos(), '\n');
             self.cursor_pos += 1;
             for c in indent.chars() {
-                self.query.insert(self.cursor_pos, c);
+                self.query.insert(self.query_byte_pos(), c);
                 self.cursor_pos += 1;
             }
         }
@@ -188,7 +189,7 @@ impl App {
                     // Insert 4 spaces for indentation
                     self.save_undo_state();
                     for _ in 0..4 {
-                        self.query.insert(self.cursor_pos, ' ');
+                        self.query.insert(self.query_byte_pos(), ' ');
                         self.cursor_pos += 1;
                     }
                 }
@@ -199,7 +200,7 @@ impl App {
                     for _ in 0..4 {
                         if self.cursor_pos > 0 {
                             self.cursor_pos -= 1;
-                            self.query.remove(self.cursor_pos);
+                            self.query.remove(self.query_byte_pos());
                         }
                     }
                 }
@@ -219,14 +220,14 @@ impl App {
             // Typing "." triggers completion automatically
             KeyCode::Char('.') => {
                 self.save_undo_state();
-                self.query.insert(self.cursor_pos, '.');
+                self.query.insert(self.query_byte_pos(), '.');
                 self.cursor_pos += 1;
                 self.trigger_completion();
             }
             // Typing "@" triggers variable completion
             KeyCode::Char('@') => {
                 self.save_undo_state();
-                self.query.insert(self.cursor_pos, '@');
+                self.query.insert(self.query_byte_pos(), '@');
                 self.cursor_pos += 1;
                 self.trigger_completion();
             }
@@ -241,12 +242,13 @@ impl App {
                     if next_char == Some('\'') {
                         self.cursor_pos += 1;
                     } else {
-                        self.query.insert(self.cursor_pos, '\'');
-                        self.query.insert(self.cursor_pos + 1, '\'');
+                        let byte_pos = self.query_byte_pos();
+                        self.query.insert(byte_pos, '\'');
+                        self.query.insert(byte_pos + 1, '\'');
                         self.cursor_pos += 1;
                     }
                 } else {
-                    self.query.insert(self.cursor_pos, c);
+                    self.query.insert(self.query_byte_pos(), c);
                     self.cursor_pos += 1;
                 }
 
@@ -263,7 +265,7 @@ impl App {
                 if self.cursor_pos > 0 {
                     self.save_undo_state();
                     self.cursor_pos -= 1;
-                    self.query.remove(self.cursor_pos);
+                    self.query.remove(self.query_byte_pos());
                     // Update or hide completion
                     if self.completion.visible {
                         self.update_completion();
@@ -272,9 +274,9 @@ impl App {
             }
             // Delete
             KeyCode::Delete => {
-                if self.cursor_pos < self.query.len() {
+                if self.cursor_pos < self.query.chars().count() {
                     self.save_undo_state();
-                    self.query.remove(self.cursor_pos);
+                    self.query.remove(self.query_byte_pos());
                 }
             }
             // Arrow keys for cursor movement
@@ -284,7 +286,7 @@ impl App {
             }
             KeyCode::Right => {
                 self.completion.hide();
-                self.cursor_pos = (self.cursor_pos + 1).min(self.query.len());
+                self.cursor_pos = (self.cursor_pos + 1).min(self.query.chars().count());
             }
             KeyCode::Up => {
                 self.completion.hide();
@@ -296,23 +298,17 @@ impl App {
             }
             KeyCode::Home => {
                 self.completion.hide();
-                // Go to start of current line
-                let text_before: String = self.query.chars().take(self.cursor_pos).collect();
-                if let Some(last_newline) = text_before.rfind('\n') {
-                    self.cursor_pos = last_newline + 1;
-                } else {
-                    self.cursor_pos = 0;
-                }
+                self.cursor_pos = self.current_line_start_char();
             }
             KeyCode::End => {
                 self.completion.hide();
                 // Go to end of current line
-                let text_after: String = self.query.chars().skip(self.cursor_pos).collect();
-                if let Some(next_newline) = text_after.find('\n') {
-                    self.cursor_pos += next_newline;
-                } else {
-                    self.cursor_pos = self.query.len();
+                let chars: Vec<char> = self.query.chars().collect();
+                let mut end = self.cursor_pos;
+                while end < chars.len() && chars[end] != '\n' {
+                    end += 1;
                 }
+                self.cursor_pos = end;
             }
             _ => {}
         }
@@ -385,7 +381,8 @@ impl App {
     /// Check if we should auto-trigger completion after typing a space
     /// (e.g., after WHERE, AND, OR, SELECT, FROM)
     fn maybe_trigger_after_keyword(&mut self) {
-        let before_cursor = &self.query[..self.cursor_pos];
+        let byte_pos = self.query_byte_pos();
+        let before_cursor = &self.query[..byte_pos];
         let upper = before_cursor.to_uppercase();
         
         // Keywords that should trigger completion when followed by space
@@ -405,7 +402,8 @@ impl App {
 
     /// Get the prefix being typed for completion (word at cursor)
     fn get_completion_prefix(&self) -> String {
-        let before_cursor = &self.query[..self.cursor_pos];
+        let byte_pos = self.query_byte_pos();
+        let before_cursor = &self.query[..byte_pos];
         let chars: Vec<char> = before_cursor.chars().collect();
         
         if chars.is_empty() {
@@ -432,18 +430,18 @@ impl App {
         if let Some(item) = self.completion.get_selected().cloned() {
             self.save_undo_state();
             
-            // Remove the prefix that was already typed
-            let prefix_len = self.completion.prefix.len();
-            for _ in 0..prefix_len {
+            // Remove the prefix that was already typed (prefix.len() is char count since it was built from chars)
+            let prefix_char_len = self.completion.prefix.chars().count();
+            for _ in 0..prefix_char_len {
                 if self.cursor_pos > 0 {
                     self.cursor_pos -= 1;
-                    self.query.remove(self.cursor_pos);
+                    self.query.remove(self.query_byte_pos());
                 }
             }
-            
+
             // Insert the completion text
             for c in item.insert_text.chars() {
-                self.query.insert(self.cursor_pos, c);
+                self.query.insert(self.query_byte_pos(), c);
                 self.cursor_pos += 1;
             }
             
@@ -462,9 +460,9 @@ impl App {
             '_' => {
                 let text_after: String = self.query.chars().skip(self.cursor_pos).collect();
                 let line_end = if let Some(next_newline) = text_after.find('\n') {
-                    self.cursor_pos + next_newline
+                    self.cursor_pos + text_after[..next_newline].chars().count()
                 } else {
-                    self.query.len()
+                    self.query.chars().count()
                 };
                 // Walk backwards from line end to find last non-whitespace
                 let chars: Vec<char> = self.query.chars().collect();
@@ -526,7 +524,7 @@ impl App {
                 self.cursor_pos = self.cursor_pos.saturating_sub(1);
             }
             KeyCode::Char('l') | KeyCode::Right => {
-                self.cursor_pos = (self.cursor_pos + 1).min(self.query.len().saturating_sub(1));
+                self.cursor_pos = (self.cursor_pos + 1).min(self.query.chars().count().saturating_sub(1));
             }
             KeyCode::Char('k') | KeyCode::Up => {
                 self.move_cursor_up();
@@ -540,7 +538,7 @@ impl App {
                     if let Ok(text) = clipboard.get_text() {
                         self.save_undo_state();
                         for c in text.chars() {
-                            self.query.insert(self.cursor_pos, c);
+                            self.query.insert(self.query_byte_pos(), c);
                             self.cursor_pos += 1;
                         }
                     }
@@ -548,33 +546,25 @@ impl App {
             }
             // Line start/end
             KeyCode::Char('0') | KeyCode::Home => {
-                let text_before: String = self.query.chars().take(self.cursor_pos).collect();
-                if let Some(last_newline) = text_before.rfind('\n') {
-                    self.cursor_pos = last_newline + 1;
-                } else {
-                    self.cursor_pos = 0;
-                }
+                self.cursor_pos = self.current_line_start_char();
             }
             KeyCode::Char('$') | KeyCode::End => {
-                let text_after: String = self.query.chars().skip(self.cursor_pos).collect();
-                if let Some(next_newline) = text_after.find('\n') {
-                    self.cursor_pos += next_newline;
-                } else {
-                    self.cursor_pos = self.query.len();
+                let chars: Vec<char> = self.query.chars().collect();
+                let mut end = self.cursor_pos;
+                while end < chars.len() && chars[end] != '\n' {
+                    end += 1;
                 }
+                self.cursor_pos = end;
             }
             // First non-whitespace character
             KeyCode::Char('^') => {
-                let text_before: String = self.query.chars().take(self.cursor_pos).collect();
-                let line_start = if let Some(last_newline) = text_before.rfind('\n') {
-                    last_newline + 1
-                } else {
-                    0
-                };
-                let line: String = self.query.chars().skip(line_start).collect();
-                let first_non_white = line.find(|c: char| !c.is_whitespace() || c == '\n')
-                    .unwrap_or(0);
-                self.cursor_pos = line_start + first_non_white;
+                let line_start = self.current_line_start_char();
+                let chars: Vec<char> = self.query.chars().collect();
+                let mut pos = line_start;
+                while pos < chars.len() && chars[pos] != '\n' && (chars[pos] == ' ' || chars[pos] == '\t') {
+                    pos += 1;
+                }
+                self.cursor_pos = pos;
             }
             // Word forward
             KeyCode::Char('w') => {
@@ -603,6 +593,20 @@ impl App {
                     pos -= 1;
                 }
                 self.cursor_pos = pos;
+            }
+            // Word end forward (e)
+            KeyCode::Char('e') => {
+                let chars: Vec<char> = self.query.chars().collect();
+                let mut pos = self.cursor_pos + 1;
+                // Skip whitespace
+                while pos < chars.len() && chars[pos].is_whitespace() {
+                    pos += 1;
+                }
+                // Move to end of word
+                while pos < chars.len() && chars[pos].is_alphanumeric() {
+                    pos += 1;
+                }
+                self.cursor_pos = pos.saturating_sub(1).min(chars.len().saturating_sub(1));
             }
             // Find character forward (f)
             KeyCode::Char('f') => {
@@ -634,7 +638,7 @@ impl App {
             }
             // G = go to end of document
             KeyCode::Char('G') => {
-                self.cursor_pos = self.query.len().saturating_sub(1);
+                self.cursor_pos = self.query.chars().count().saturating_sub(1);
             }
             // Undo
             KeyCode::Char('u') => {
@@ -646,10 +650,12 @@ impl App {
             }
             // Delete character
             KeyCode::Char('x') => {
-                if self.cursor_pos < self.query.len() {
+                let char_count = self.query.chars().count();
+                if self.cursor_pos < char_count {
                     self.save_undo_state();
-                    self.query.remove(self.cursor_pos);
-                    if self.cursor_pos >= self.query.len() && self.cursor_pos > 0 {
+                    self.query.remove(self.query_byte_pos());
+                    let new_char_count = self.query.chars().count();
+                    if self.cursor_pos >= new_char_count && self.cursor_pos > 0 {
                         self.cursor_pos -= 1;
                     }
                 }
@@ -658,45 +664,44 @@ impl App {
             KeyCode::Char('d') => {
                 self.save_undo_state();
                 let text_before: String = self.query.chars().take(self.cursor_pos).collect();
-                let line_start = if let Some(last_newline) = text_before.rfind('\n') {
-                    last_newline + 1
+                let line_start_char = if let Some(last_newline) = text_before.rfind('\n') {
+                    // last_newline is a byte index in text_before; convert to char index
+                    text_before[..last_newline].chars().count() + 1
                 } else {
                     0
                 };
                 let text_after: String = self.query.chars().skip(self.cursor_pos).collect();
-                let line_end = if let Some(next_newline) = text_after.find('\n') {
-                    self.cursor_pos + next_newline + 1
+                let line_end_char = if let Some(next_newline) = text_after.find('\n') {
+                    // next_newline is byte index in text_after; convert to char count
+                    self.cursor_pos + text_after[..next_newline].chars().count() + 1
                 } else {
-                    self.query.len()
+                    self.query.chars().count()
                 };
-                self.query.drain(line_start..line_end);
-                self.cursor_pos = line_start.min(self.query.len().saturating_sub(1));
+                let byte_start = Self::char_to_byte_index(&self.query, line_start_char);
+                let byte_end = Self::char_to_byte_index(&self.query, line_end_char);
+                self.query.drain(byte_start..byte_end);
+                self.cursor_pos = line_start_char.min(self.query.chars().count().saturating_sub(1));
             }
             // Append (insert after cursor)
             KeyCode::Char('a') => {
-                if self.cursor_pos < self.query.len() {
+                if self.cursor_pos < self.query.chars().count() {
                     self.cursor_pos += 1;
                 }
                 self.input_mode = InputMode::Insert;
             }
             // Append at end of line
             KeyCode::Char('A') => {
-                let text_after: String = self.query.chars().skip(self.cursor_pos).collect();
-                if let Some(next_newline) = text_after.find('\n') {
-                    self.cursor_pos += next_newline;
-                } else {
-                    self.cursor_pos = self.query.len();
+                let chars: Vec<char> = self.query.chars().collect();
+                let mut end = self.cursor_pos;
+                while end < chars.len() && chars[end] != '\n' {
+                    end += 1;
                 }
+                self.cursor_pos = end;
                 self.input_mode = InputMode::Insert;
             }
             // Insert at start of line
             KeyCode::Char('I') => {
-                let text_before: String = self.query.chars().take(self.cursor_pos).collect();
-                if let Some(last_newline) = text_before.rfind('\n') {
-                    self.cursor_pos = last_newline + 1;
-                } else {
-                    self.cursor_pos = 0;
-                }
+                self.cursor_pos = self.current_line_start_char();
                 self.input_mode = InputMode::Insert;
             }
             // New line below
@@ -704,16 +709,17 @@ impl App {
                 self.save_undo_state();
                 let indent = self.get_current_line_indent();
                 let text_after: String = self.query.chars().skip(self.cursor_pos).collect();
-                let line_end = if let Some(next_newline) = text_after.find('\n') {
-                    self.cursor_pos + next_newline
+                let line_end_char = if let Some(next_newline) = text_after.find('\n') {
+                    self.cursor_pos + text_after[..next_newline].chars().count()
                 } else {
-                    self.query.len()
+                    self.query.chars().count()
                 };
-                self.query.insert(line_end, '\n');
-                self.cursor_pos = line_end + 1;
+                let byte_pos = Self::char_to_byte_index(&self.query, line_end_char);
+                self.query.insert(byte_pos, '\n');
+                self.cursor_pos = line_end_char + 1;
                 // Insert the same indentation on the new line
                 for c in indent.chars() {
-                    self.query.insert(self.cursor_pos, c);
+                    self.query.insert(self.query_byte_pos(), c);
                     self.cursor_pos += 1;
                 }
                 self.input_mode = InputMode::Insert;
@@ -723,25 +729,27 @@ impl App {
                 self.save_undo_state();
                 let indent = self.get_current_line_indent();
                 let text_before: String = self.query.chars().take(self.cursor_pos).collect();
-                let line_start = if let Some(last_newline) = text_before.rfind('\n') {
-                    last_newline + 1
+                let line_start_char = if let Some(last_newline) = text_before.rfind('\n') {
+                    text_before[..last_newline].chars().count() + 1
                 } else {
                     0
                 };
-                // Insert indentation first, then newline
-                for c in indent.chars() {
-                    self.query.insert(line_start, c);
-                }
-                self.query.insert(line_start + indent.len(), '\n');
-                self.cursor_pos = line_start + indent.len();
+                // Build the string to insert: indent + newline
+                let mut insert_str = indent.clone();
+                insert_str.push('\n');
+                let byte_start = Self::char_to_byte_index(&self.query, line_start_char);
+                self.query.insert_str(byte_start, &insert_str);
+                self.cursor_pos = line_start_char + indent.chars().count();
                 self.input_mode = InputMode::Insert;
             }
             // Change character
             KeyCode::Char('c') => {
-                if self.cursor_pos < self.query.len() {
+                let char_count = self.query.chars().count();
+                if self.cursor_pos < char_count {
                     self.save_undo_state();
-                    self.query.remove(self.cursor_pos);
-                    if self.cursor_pos >= self.query.len() && self.cursor_pos > 0 {
+                    self.query.remove(self.query_byte_pos());
+                    let new_char_count = self.query.chars().count();
+                    if self.cursor_pos >= new_char_count && self.cursor_pos > 0 {
                         self.cursor_pos -= 1;
                     }
                     self.input_mode = InputMode::Insert;
@@ -797,7 +805,7 @@ impl App {
                 self.cursor_pos = self.cursor_pos.saturating_sub(1);
             }
             KeyCode::Char('l') | KeyCode::Right => {
-                self.cursor_pos = (self.cursor_pos + 1).min(self.query.len().saturating_sub(1));
+                self.cursor_pos = (self.cursor_pos + 1).min(self.query.chars().count().saturating_sub(1));
             }
             KeyCode::Char('k') | KeyCode::Up => {
                 self.move_cursor_up();
@@ -809,7 +817,7 @@ impl App {
             KeyCode::Char('0') | KeyCode::Home => {
                 let text_before: String = self.query.chars().take(self.cursor_pos).collect();
                 if let Some(last_newline) = text_before.rfind('\n') {
-                    self.cursor_pos = last_newline + 1;
+                    self.cursor_pos = text_before[..last_newline].chars().count() + 1;
                 } else {
                     self.cursor_pos = 0;
                 }
@@ -817,9 +825,9 @@ impl App {
             KeyCode::Char('$') | KeyCode::End => {
                 let text_after: String = self.query.chars().skip(self.cursor_pos).collect();
                 if let Some(next_newline) = text_after.find('\n') {
-                    self.cursor_pos += next_newline;
+                    self.cursor_pos += text_after[..next_newline].chars().count();
                 } else {
-                    self.cursor_pos = self.query.len().saturating_sub(1);
+                    self.cursor_pos = self.query.chars().count().saturating_sub(1);
                 }
             }
             // Word forward
@@ -845,6 +853,18 @@ impl App {
                     pos -= 1;
                 }
                 self.cursor_pos = pos;
+            }
+            // Word end forward (e)
+            KeyCode::Char('e') => {
+                let chars: Vec<char> = self.query.chars().collect();
+                let mut pos = self.cursor_pos + 1;
+                while pos < chars.len() && chars[pos].is_whitespace() {
+                    pos += 1;
+                }
+                while pos < chars.len() && chars[pos].is_alphanumeric() {
+                    pos += 1;
+                }
+                self.cursor_pos = pos.saturating_sub(1).min(chars.len().saturating_sub(1));
             }
             // Find character forward (f)
             KeyCode::Char('f') => {
@@ -876,7 +896,7 @@ impl App {
             }
             // G = go to end of document
             KeyCode::Char('G') => {
-                self.cursor_pos = self.query.len().saturating_sub(1);
+                self.cursor_pos = self.query.chars().count().saturating_sub(1);
             }
             // Yank (copy) selection
             KeyCode::Char('y') => {
@@ -910,7 +930,7 @@ impl App {
             // Select all (simulated ggVG)
             KeyCode::Char('a') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 self.visual_anchor = 0;
-                self.cursor_pos = self.query.len().saturating_sub(1);
+                self.cursor_pos = self.query.chars().count().saturating_sub(1);
             }
             _ => {}
         }

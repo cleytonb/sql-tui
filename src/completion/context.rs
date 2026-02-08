@@ -205,8 +205,7 @@ fn resolve_dot_context(word_before: &str, before_upper: &str, tables: &[TableRef
 /// Find the start of the current SQL statement containing the cursor.
 /// Splits on statement-starting keywords (SELECT, INSERT, UPDATE, DELETE, EXEC, WITH, CREATE, ALTER, DROP)
 /// that appear at the beginning of a line (after optional whitespace).
-fn find_current_statement_start(query: &str, cursor_pos: usize) -> usize {
-    let before = &query[..cursor_pos.min(query.len())];
+fn find_current_statement_start(before: &str) -> usize {
 
     // Walk backwards through lines to find the last statement-starting keyword
     let statement_starters = [
@@ -236,17 +235,14 @@ fn find_current_statement_start(query: &str, cursor_pos: usize) -> usize {
 
 /// Extract the SQL context at the given cursor position
 pub fn extract_context(query: &str, cursor_pos: usize) -> SqlContext {
-    let before_cursor = if cursor_pos <= query.len() {
-        &query[..cursor_pos]
-    } else {
-        query
-    };
+    let byte_pos = crate::app::App::char_to_byte_index(query, cursor_pos);
+    let before_cursor = &query[..byte_pos];
 
     let before_upper = before_cursor.to_uppercase();
     let trimmed = before_cursor.trim_end();
 
     // Isolate the current SQL statement to avoid mixing table refs from different statements
-    let stmt_start = find_current_statement_start(query, cursor_pos);
+    let stmt_start = find_current_statement_start(before_cursor);
     let current_statement = &query[stmt_start..];
 
     // Extract tables referenced only in the current statement
