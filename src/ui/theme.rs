@@ -51,7 +51,7 @@ impl DefaultTheme {
     }
 
     pub fn active_border() -> Style {
-        Style::default().fg(Self::PRIMARY_LIGHT)
+        Style::default().fg(Self::GOLD)
     }
 
     pub fn inactive_border() -> Style {

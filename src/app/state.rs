@@ -190,6 +190,8 @@ pub struct App {
     pub history: QueryHistory,
     /// History scroll position
     pub history_selected: usize,
+    /// Scroll offset for history panel (for proper scroll behavior)
+    pub history_scroll_offset: usize,
 
     // === Undo/Redo ===
     /// Undo manager for query editor
@@ -288,6 +290,7 @@ impl App {
             columns_loading: false,
             history: QueryHistory::new(1000),
             history_selected: 0,
+            history_scroll_offset: 0,
             undo_manager: UndoManager::new(1000),
             command_mode: false,
             active_panel: ActivePanel::QueryEditor,
