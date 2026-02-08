@@ -190,7 +190,7 @@ fn draw_status_bar(f: &mut Frame, app: &App, area: Rect) {
 
 /// Draw help popup
 pub fn draw_help_popup(f: &mut Frame, area: Rect) {
-    let popup_area = centered_rect(30, 30, area);
+    let popup_area = centered_rect(30, 60, area);
 
     // Clear the area
     f.render_widget(Clear, popup_area);
@@ -198,12 +198,56 @@ pub fn draw_help_popup(f: &mut Frame, area: Rect) {
     let help_text = vec![
         Line::from(Span::styled(t!("help_header").to_string(), DefaultTheme::title())),
         Line::from(""),
-        Line::from(Span::styled(t!("help_rule").to_string(), DefaultTheme::info())),
+        Line::from(Span::styled(t!("help_rule_global").to_string(), DefaultTheme::info())),
         Line::from(""),
         Line::from(t!("help_quote1").to_string()),
+        Line::from(t!("help_quote2").to_string()),
+        Line::from(t!("help_quote3").to_string()),
+        Line::from(t!("help_quote4").to_string()),
+        Line::from(t!("help_quote5").to_string()),
+        Line::from(t!("help_quote6").to_string()),
+        Line::from(t!("help_quote7").to_string()),
+        Line::from(t!("help_quote8").to_string()),
+        Line::from(t!("help_quote9").to_string()),
+        Line::from(t!("help_quote10").to_string()),
+        Line::from(t!("help_quote11").to_string()),
+        Line::from(t!("help_quote12").to_string()),
         Line::from(""),
+        Line::from(Span::styled(t!("help_rule_query_editor").to_string(), DefaultTheme::info())),
         Line::from(""),
-        Line::from(t!("help_quote2").to_string())
+        Line::from(t!("help_quote13").to_string()),
+        Line::from(t!("help_quote14").to_string()),
+        Line::from(t!("help_quote15").to_string()),
+        Line::from(t!("help_quote16").to_string()),
+        Line::from(t!("help_quote17").to_string()),
+        Line::from(t!("help_quote18").to_string()),
+        Line::from(t!("help_quote19").to_string()),
+        Line::from(t!("help_quote20").to_string()),
+        Line::from(t!("help_quote21").to_string()),
+        Line::from(""),
+        Line::from(Span::styled(t!("help_rule_results").to_string(), DefaultTheme::info())),
+        Line::from(""),
+        Line::from(t!("help_quote22").to_string()),
+        Line::from(t!("help_quote23").to_string()),
+        Line::from(t!("help_quote24").to_string()),
+        Line::from(t!("help_quote25").to_string()),
+        Line::from(t!("help_quote26").to_string()),
+        Line::from(t!("help_quote27").to_string()),
+        Line::from(t!("help_quote28").to_string()),
+        Line::from(t!("help_quote29").to_string()),
+        Line::from(""),
+        Line::from(Span::styled(t!("help_rule_schema").to_string(), DefaultTheme::info())),
+        Line::from(""),
+        Line::from(t!("help_quote30").to_string()),
+        Line::from(t!("help_quote31").to_string()),
+        Line::from(t!("help_quote32").to_string()),
+        Line::from(""),
+        Line::from(Span::styled(t!("help_rule_history").to_string(), DefaultTheme::info())),
+        Line::from(""),
+        Line::from(t!("help_quote33").to_string()),
+        Line::from(""),
+
+        Line::from(("\"Mais um dia para provar que o rock não morreu\"").to_string()),
     ];
 
     let help = Paragraph::new(help_text)

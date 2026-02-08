@@ -104,11 +104,6 @@ impl App {
                 self.start_query();
                 return Ok(());
             }
-            // Ctrl+F = Format SQL
-            KeyCode::Char('f') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                self.format_sql();
-                return Ok(());
-            }
             // Ctrl+D = Smooth scroll down
             KeyCode::Char('d') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 self.pending_scroll += 10;

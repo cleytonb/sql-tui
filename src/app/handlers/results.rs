@@ -81,7 +81,7 @@ impl App {
                 self.results_selected = max_rows.saturating_sub(1);
             }
             // Copy cell
-            KeyCode::Char('y') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+            KeyCode::Char('y') => {
                 self.copy_current_cell();
             }
             // Export CSV (Ctrl+E)
@@ -94,10 +94,6 @@ impl App {
             // Copy row as INSERT statement
             KeyCode::Char('i') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 self.copy_row_as_insert();
-            }
-            // Enter/Esc goes back to query editor
-            KeyCode::Enter | KeyCode::Esc => {
-                self.active_panel = ActivePanel::QueryEditor;
             }
             _ => {}
         }

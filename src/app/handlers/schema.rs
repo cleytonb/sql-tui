@@ -91,8 +91,6 @@ impl App {
                     self.schema_search_query.clear();
                     self.schema_selected = 0;
                     self.schema_scroll_offset = 0;
-                } else {
-                    self.active_panel = ActivePanel::QueryEditor;
                 }
             }
             _ => {}
