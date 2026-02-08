@@ -1,0 +1,82 @@
+[sqruff]
+# Dialeto SQL Server / T-SQL
+dialect = tsql
+
+# Usar TODAS as regras (inclui layout como LT09)
+rules = all
+
+# Limite de caracteres por linha
+max_line_length = 50
+
+[sqruff:indentation]
+# Indentação com espaços
+indent_unit = space
+tab_space_size = 4
+
+# JOINs NÃO indentados (mesma linha do FROM)
+indented_joins = False
+
+# CTEs NÃO indentadas (WITH active_users AS, não WITH\n    active_users)
+indented_ctes = False
+
+# ON indentado em relação ao JOIN
+indented_using_on = True
+
+# Conteúdo do ON indentado
+indented_on_contents = True
+
+# THEN indentado em CASE
+indented_then = True
+indented_then_contents = True
+
+# Regras de capitalização - UPPER para keywords
+[sqruff:rules:capitalisation.keywords]
+capitalisation_policy = upper
+
+# Funções em UPPER
+[sqruff:rules:capitalisation.functions]
+extended_capitalisation_policy = upper
+
+# NULL, TRUE, FALSE em UPPER
+[sqruff:rules:capitalisation.literals]
+capitalisation_policy = upper
+
+# Tipos de dados em UPPER
+[sqruff:rules:capitalisation.types]
+extended_capitalisation_policy = upper
+
+# Identificadores em lower
+[sqruff:rules:capitalisation.identifiers]
+extended_capitalisation_policy = lower
+
+# Usar <> ao invés de != (padrão SQL Server)
+[sqruff:rules:convention.not_equal]
+preferred_not_equal_style = ansi
+
+# Vírgulas no final (trailing)
+[sqruff:layout:type:comma]
+spacing_before = touch
+line_position = trailing
+
+# Aliases explícitos com AS
+[sqruff:rules:aliasing.table]
+aliasing = explicit
+
+[sqruff:rules:aliasing.column]
+aliasing = explicit
+
+# JOINs totalmente qualificados (INNER JOIN, não só JOIN)
+[sqruff:rules:ambiguous.join]
+fully_qualify_join_types = inner
+
+# CTE: conteúdo pode ter múltiplas linhas
+[sqruff:layout:type:common_table_expression]
+spacing_within = any
+
+# LT07: Bracket de fechamento do CTE em nova linha
+[sqruff:rules:layout.cte_bracket]
+# Esta regra força o ) do CTE em nova linha
+
+# LT08: Linha em branco após o CTE
+[sqruff:rules:layout.cte_newline]
+# Esta regra adiciona linha em branco após o )

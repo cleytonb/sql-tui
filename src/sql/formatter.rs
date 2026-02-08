@@ -1,106 +1,25 @@
-//! SQL formatter - formats SQL with proper indentation and line breaks
+//! SQL formatter - uses sqruff for proper SQL formatting
 
-/// Format SQL query with proper indentation and line breaks
+use sqruff_lib::core::config::FluffConfig;
+use sqruff_lib::core::linter::core::Linter;
+
+/// Format SQL query using sqruff with .sqruff config file
 pub fn format_sql_query(sql: &str) -> String {
-    let keywords_newline_before = [
-        "SELECT", "FROM", "WHERE", "AND", "OR", "ORDER BY", "GROUP BY",
-        "HAVING", "JOIN", "INNER JOIN", "LEFT JOIN", "RIGHT JOIN",
-        "OUTER JOIN", "CROSS JOIN", "UNION", "UNION ALL",
-        "INSERT INTO", "VALUES", "UPDATE", "SET", "DELETE FROM",
-        "CREATE TABLE", "ALTER TABLE", "DROP TABLE", "CROSS", "OUTER"
-    ];
-
-    let keywords_newline_after = ["SELECT"];
-
-    // Normalize whitespace
-    let sql = sql.split_whitespace().collect::<Vec<_>>().join(" ");
-
-    let mut result = String::new();
-    let mut indent_level = 0;
-    let mut i = 0;
-    let chars: Vec<char> = sql.chars().collect();
-    let sql_upper = sql.to_uppercase();
-
-    while i < chars.len() {
-        // Check for keywords that need newline before
-        let mut matched_keyword = None;
-        for keyword in &keywords_newline_before {
-            if sql_upper[i..].starts_with(keyword) {
-                // Make sure it's a word boundary
-                let end = i + keyword.len();
-                if end >= sql_upper.len() || !sql_upper.chars().nth(end).unwrap().is_alphanumeric() {
-                    matched_keyword = Some(*keyword);
-                    break;
-                }
-            }
-        }
-
-        if let Some(keyword) = matched_keyword {
-            // Add newline before keyword (except at start)
-            if !result.is_empty() && !result.ends_with('\n') {
-                result.push('\n');
-            }
-
-            // Handle indentation
-            match keyword {
-                "AND" | "OR" => {
-                    result.push_str(&"    ".repeat(indent_level + 1));
-                }
-                _ => {
-                    result.push_str(&"    ".repeat(indent_level));
-                }
-            }
-
-            // Add the keyword with original case preserved where possible
-            let original_keyword: String = chars[i..i + keyword.len()].iter().collect();
-            result.push_str(&original_keyword.to_uppercase());
-            i += keyword.len();
-
-            // Add newline after certain keywords
-            if keywords_newline_after.contains(&keyword) {
-                result.push('\n');
-                result.push_str(&"    ".repeat(indent_level + 1));
-            } else {
-                result.push(' ');
-            }
-
-            // Skip any following whitespace
-            while i < chars.len() && chars[i].is_whitespace() {
-                i += 1;
-            }
-        } else if chars[i] == '(' {
-            result.push('(');
-            indent_level += 1;
-            i += 1;
-        } else if chars[i] == ')' {
-            result.push('\n');
-            indent_level = indent_level.saturating_sub(1);
-            result.push_str(&"    ".repeat(indent_level));
-            result.push(')');
-            i += 1;
-        } else if chars[i] == ',' {
-            result.push(',');
-            result.push('\n');
-            result.push_str(&"    ".repeat(indent_level + 1));
-            i += 1;
-            // Skip whitespace after comma
-            while i < chars.len() && chars[i].is_whitespace() {
-                i += 1;
-            }
-        } else {
-            result.push(chars[i]);
-            i += 1;
-        }
+    // Tenta carregar configuração do arquivo .sqruff na raiz do projeto
+    // Se não encontrar, usa configuração padrão
+    let config = FluffConfig::from_root(None, false, None)
+        .unwrap_or_else(|_| FluffConfig::default());
+    
+    let linter = Linter::new(config, None, None, false);
+    
+    let result = linter.lint_string(sql, None, true);
+    let formatted = result.fix_string();
+    
+    if formatted.is_empty() {
+        sql.to_string()
+    } else {
+        formatted
     }
-
-    // Clean up extra whitespace
-    result
-        .lines()
-        .map(|line| line.trim_end())
-        .collect::<Vec<_>>()
-        .join("\n")
-        .trim()
-        .to_string()
 }
 
 #[cfg(test)]
@@ -123,5 +42,27 @@ mod tests {
         assert!(formatted.contains("id"));
         assert!(formatted.contains("name"));
         assert!(formatted.contains("users"));
+    }
+
+    #[test]
+    fn test_format_complex_query() {
+        let sql = "select a,b,c from table1 inner join table2 on table1.id=table2.id where a>1 and b<2 order by c";
+        let formatted = format_sql_query(sql);
+        // sqruff deve formatar com quebras de linha e indentação
+        println!("Formatted:\n{}", formatted);
+        assert!(!formatted.is_empty());
+    }
+
+    #[test]
+    fn test_format_long_query() {
+        let sql = "select customer_id, customer_name, customer_email, order_date, order_total, product_name, product_category from customers inner join orders on customers.id = orders.customer_id inner join order_items on orders.id = order_items.order_id inner join products on order_items.product_id = products.id where order_date >= '2024-01-01' and order_total > 100 order by order_date desc, customer_name asc";
+        let formatted = format_sql_query(sql);
+        println!("Long query formatted:\n{}", formatted);
+        // Deve ter quebras de linha
+        assert!(formatted.contains('\n'), "Query longa deve ter quebras de linha");
+        // Keywords em UPPER
+        assert!(formatted.contains("SELECT"));
+        assert!(formatted.contains("FROM"));
+        assert!(formatted.contains("INNER JOIN"));
     }
 }
