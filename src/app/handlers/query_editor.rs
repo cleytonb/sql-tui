@@ -174,9 +174,23 @@ impl App {
             // Regular typing
             KeyCode::Char(c) => {
                 self.save_undo_state();
-                self.query.insert(self.cursor_pos, c);
-                self.cursor_pos += 1;
-                
+
+                // Autoclose: single quotes
+                if c == '\'' {
+                    // If next char is already a closing quote, just skip over it
+                    let next_char = self.query.chars().nth(self.cursor_pos);
+                    if next_char == Some('\'') {
+                        self.cursor_pos += 1;
+                    } else {
+                        self.query.insert(self.cursor_pos, '\'');
+                        self.query.insert(self.cursor_pos + 1, '\'');
+                        self.cursor_pos += 1;
+                    }
+                } else {
+                    self.query.insert(self.cursor_pos, c);
+                    self.cursor_pos += 1;
+                }
+
                 // After typing space, check if we should auto-trigger completion
                 if c == ' ' {
                     self.maybe_trigger_after_keyword();
