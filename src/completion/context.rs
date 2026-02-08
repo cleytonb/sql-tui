@@ -244,7 +244,43 @@ pub fn extract_context(query: &str, cursor_pos: usize) -> SqlContext {
 /// Extract table references from the query (FROM and JOIN clauses)
 fn extract_table_references(query: &str) -> Vec<TableRef> {
     let mut tables = Vec::new();
-    let upper = query.to_uppercase();
+    
+    // Normalize whitespace: replace all whitespace sequences with single spaces
+    // This handles cases where FROM/JOIN is followed by newlines instead of spaces
+    let normalized: String = query.chars()
+        .map(|c| if c.is_whitespace() { ' ' } else { c })
+        .collect();
+    let upper = normalized.to_uppercase();
+    
+    // Collapse multiple spaces into one for easier matching
+    let mut collapsed = String::with_capacity(upper.len());
+    let mut prev_space = false;
+    for c in upper.chars() {
+        if c == ' ' {
+            if !prev_space {
+                collapsed.push(c);
+            }
+            prev_space = true;
+        } else {
+            collapsed.push(c);
+            prev_space = false;
+        }
+    }
+    
+    // Also need a collapsed version of the original query (preserving case)
+    let mut normalized_collapsed = String::with_capacity(normalized.len());
+    prev_space = false;
+    for c in normalized.chars() {
+        if c == ' ' {
+            if !prev_space {
+                normalized_collapsed.push(c);
+            }
+            prev_space = true;
+        } else {
+            normalized_collapsed.push(c);
+            prev_space = false;
+        }
+    }
     
     // Simple regex-like parsing for FROM and JOIN clauses
     // Pattern: FROM|JOIN schema.table [AS] alias
@@ -254,9 +290,9 @@ fn extract_table_references(query: &str) -> Vec<TableRef> {
     
     for keyword in keywords {
         let mut search_pos = 0;
-        while let Some(kw_pos) = upper[search_pos..].find(keyword) {
+        while let Some(kw_pos) = collapsed[search_pos..].find(keyword) {
             let start = search_pos + kw_pos + keyword.len();
-            if let Some(table_ref) = parse_table_reference(&query[start..]) {
+            if let Some(table_ref) = parse_table_reference(&normalized_collapsed[start..]) {
                 // Avoid duplicates
                 if !tables.iter().any(|t: &TableRef| {
                     t.table.eq_ignore_ascii_case(&table_ref.table) && t.schema == table_ref.schema
@@ -470,5 +506,58 @@ mod tests {
     fn test_general() {
         let ctx = extract_context("SEL", 3);
         assert!(matches!(ctx, SqlContext::General { prefix } if prefix == "SEL"));
+    }
+
+    #[test]
+    fn test_alias_after_from_with_newline() {
+        // FROM followed by newline instead of space
+        let query = "SELECT\n    c.\nFROM\n    pmt.Contas c";
+        let ctx = extract_context(query, 13); // Position after "c."
+        
+        assert!(matches!(
+            &ctx,
+            SqlContext::AfterTableAliasDot { alias, table_ref: Some(tref) } 
+            if alias == "c" && tref.table == "Contas"
+        ), "Expected AfterTableAliasDot for alias 'c', got {:?}", ctx);
+    }
+
+    #[test]
+    fn test_multiple_aliases_with_newlines() {
+        // Realistic query with multiple table aliases - cursor after nc.
+        // "SELECT\n    c.Nome,\n    nc." = 25 chars
+        let query = "SELECT\n    c.Nome,\n    nc.\nFROM\n    pmt.Contas c\njoin pmt.NegociacoesContas nc ON c.CodNegociacaoConta = nc.CodNegociacaoConta";
+        
+        // Find the position after "nc."
+        let cursor_pos = query.find("nc.").unwrap() + 3;
+        
+        // Check alias 'nc' is resolved
+        let ctx = extract_context(query, cursor_pos);
+        assert!(matches!(
+            &ctx,
+            SqlContext::AfterTableAliasDot { alias, table_ref: Some(tref) } 
+            if alias == "nc" && tref.table == "NegociacoesContas"
+        ), "Expected AfterTableAliasDot for alias 'nc', got {:?}", ctx);
+    }
+
+    #[test]
+    fn test_extract_table_refs_from_with_newline() {
+        let query = "SELECT * FROM\n    pmt.Contas c\njoin pmt.NegociacoesContas nc ON x = y";
+        let tables = extract_table_references(query);
+        
+        assert_eq!(tables.len(), 2, "Expected 2 tables, got {:?}", tables);
+        
+        // First table: pmt.Contas c
+        let contas = tables.iter().find(|t| t.table == "Contas");
+        assert!(contas.is_some(), "Expected to find Contas table");
+        let contas = contas.unwrap();
+        assert_eq!(contas.alias, Some("c".to_string()));
+        assert_eq!(contas.schema, Some("pmt".to_string()));
+        
+        // Second table: pmt.NegociacoesContas nc
+        let neg = tables.iter().find(|t| t.table == "NegociacoesContas");
+        assert!(neg.is_some(), "Expected to find NegociacoesContas table");
+        let neg = neg.unwrap();
+        assert_eq!(neg.alias, Some("nc".to_string()));
+        assert_eq!(neg.schema, Some("pmt".to_string()));
     }
 }
