@@ -151,7 +151,7 @@ fn draw_status_bar(f: &mut Frame, app: &App, area: Rect) {
         .direction(Direction::Horizontal)
         .constraints([
             Constraint::Min(20),      // Messages
-            Constraint::Length(76),   // Status info
+            Constraint::Length(78),   // Status info
         ])
         .split(area);
 

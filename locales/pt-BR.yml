@@ -1,7 +1,7 @@
 _version: 1
 
 # Status de conexão
-connected: "Conectado ao SQL Server"
+connected: "Conectado"
 connected_to: "Conectado a %{name}"
 disconnected: "Desconectado"
 
@@ -73,3 +73,4 @@ connection_error: "Erro de conexão: %{error}"
 no_results_to_export: "Nenhum resultado para exportar"
 export_failed: "Falha na exportação: %{error}"
 query_interrupted: "Execução da query interrompida"
+not_connected_to_database: "Não conectado ao banco de dados"

@@ -211,7 +211,7 @@ impl App {
     /// Start query execution (non-blocking)
     pub fn start_query(&mut self) {
         if !self.is_connected() {
-            self.error = Some("Não conectado ao banco de dados".to_string());
+            self.error = Some(t!("not_connected_to_database").to_string());
             return;
         }
 
