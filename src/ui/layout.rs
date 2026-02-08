@@ -190,14 +190,41 @@ fn draw_status_bar(f: &mut Frame, app: &App, area: Rect) {
 
 /// Draw help popup
 pub fn draw_help_popup(f: &mut Frame, area: Rect) {
-    let popup_area = centered_rect(30, 60, area);
+    let popup_area = centered_rect(60, 70, area);
 
     // Clear the area
     f.render_widget(Clear, popup_area);
 
-    let help_text = vec![
+    // Outer block
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(DefaultTheme::popup_border())
+        .title(Span::styled(format!(" {} ", t!("help_title")), DefaultTheme::title()))
+        .style(DefaultTheme::popup());
+    let inner = block.inner(popup_area);
+    f.render_widget(block, popup_area);
+
+    // Header centered
+    let header_area = Rect { height: 2, ..inner };
+    let header = Paragraph::new(vec![
         Line::from(Span::styled(t!("help_header").to_string(), DefaultTheme::title())),
         Line::from(""),
+    ]);
+    f.render_widget(header, header_area);
+
+    // Split remaining area into 2 columns
+    let content_area = Rect {
+        y: inner.y + 2,
+        height: inner.height.saturating_sub(3),
+        ..inner
+    };
+    let columns = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+        .split(content_area);
+
+    // Left column: Global + Query Editor
+    let left_text = vec![
         Line::from(Span::styled(t!("help_rule_global").to_string(), DefaultTheme::info())),
         Line::from(""),
         Line::from(t!("help_quote1").to_string()),
@@ -224,7 +251,11 @@ pub fn draw_help_popup(f: &mut Frame, area: Rect) {
         Line::from(t!("help_quote19").to_string()),
         Line::from(t!("help_quote20").to_string()),
         Line::from(t!("help_quote21").to_string()),
-        Line::from(""),
+    ];
+    f.render_widget(Paragraph::new(left_text), columns[0]);
+
+    // Right column: Results + Schema + History
+    let right_text = vec![
         Line::from(Span::styled(t!("help_rule_results").to_string(), DefaultTheme::info())),
         Line::from(""),
         Line::from(t!("help_quote22").to_string()),
@@ -245,22 +276,19 @@ pub fn draw_help_popup(f: &mut Frame, area: Rect) {
         Line::from(Span::styled(t!("help_rule_history").to_string(), DefaultTheme::info())),
         Line::from(""),
         Line::from(t!("help_quote33").to_string()),
-        Line::from(""),
-
-        Line::from(("\"Mais um dia para provar que o rock não morreu\"").to_string()),
     ];
+    f.render_widget(Paragraph::new(right_text), columns[1]);
 
-    let help = Paragraph::new(help_text)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_style(DefaultTheme::popup_border())
-                .title(Span::styled(format!(" {} ", t!("help_title")), DefaultTheme::title()))
-                .style(DefaultTheme::popup()),
-        )
-        .wrap(ratatui::widgets::Wrap { trim: false });
-
-    f.render_widget(help, popup_area);
+    // Footer
+    let footer_area = Rect {
+        y: content_area.y + content_area.height,
+        height: 1,
+        ..inner
+    };
+    let footer = Paragraph::new(Line::from(
+        "\"Mais um dia para provar que o rock não morreu\"".to_string(),
+    ));
+    f.render_widget(footer, footer_area);
 }
 
 /// Helper to create a centered rect
