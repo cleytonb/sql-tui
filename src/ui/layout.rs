@@ -33,7 +33,7 @@ fn draw_header(f: &mut Frame, app: &App, area: Rect) {
     let header_chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
-            Constraint::Length(40),  // Logo/title
+            Constraint::Length(20),  // Logo/title
             Constraint::Min(20),     // Connection info
             Constraint::Length(25),  // Quick hints
         ])
@@ -42,16 +42,15 @@ fn draw_header(f: &mut Frame, app: &App, area: Rect) {
     // Logo/Title
     let logo = Paragraph::new(vec![
         Line::from(vec![
-            Span::styled("╔══════════════════════════╗", DefaultTheme::title()),
+            Span::styled("╔═════════════════╗", DefaultTheme::title()),
         ]),
         Line::from(vec![
             Span::styled("║ ", DefaultTheme::title()),
-            Span::styled("🏦 CRYPTONICS ", Style::default().fg(DefaultTheme::GOLD).add_modifier(Modifier::BOLD)),
-            Span::styled("SQL Studio ", Style::default().fg(DefaultTheme::TEXT)),
+            Span::styled("SQL Terminal UI ", Style::default().fg(DefaultTheme::TEXT)),
             Span::styled("║", DefaultTheme::title()),
         ]),
         Line::from(vec![
-            Span::styled("╚══════════════════════════╝", DefaultTheme::title()),
+            Span::styled("╚═════════════════╝", DefaultTheme::title()),
         ]),
     ])
     .style(DefaultTheme::header());
