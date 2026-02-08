@@ -76,18 +76,24 @@ impl App {
     }
 
     /// Process one step of smooth scroll animation
+    /// For QueryEditor: moves cursor, viewport scrolls only when cursor exits visible area
+    /// For other panels: scrolls selection directly
     fn process_smooth_scroll(&mut self) {
         if self.pending_scroll == 0 {
             return;
         }
 
         if self.pending_scroll > 0 {
-            self.scroll_down(1);
-            self.move_cursor_down();
+            match self.active_panel {
+                ActivePanel::QueryEditor => self.move_cursor_down(),
+                _ => self.scroll_down(1),
+            }
             self.pending_scroll -= 1;
         } else {
-            self.scroll_up(1);
-            self.move_cursor_up();
+            match self.active_panel {
+                ActivePanel::QueryEditor => self.move_cursor_up(),
+                _ => self.scroll_up(1),
+            }
             self.pending_scroll += 1;
         }
     }

@@ -6,6 +6,27 @@ use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 impl App {
+    /// Get the indentation (leading whitespace) of the current line
+    fn get_current_line_indent(&self) -> String {
+        let text_before: String = self.query.chars().take(self.cursor_pos).collect();
+        let line_start = if let Some(last_newline) = text_before.rfind('\n') {
+            last_newline + 1
+        } else {
+            0
+        };
+        
+        // Extract leading whitespace from current line
+        let mut indent = String::new();
+        for c in self.query.chars().skip(line_start) {
+            if c == ' ' || c == '\t' {
+                indent.push(c);
+            } else {
+                break;
+            }
+        }
+        indent
+    }
+
     /// Query Editor handler
     pub(crate) fn handle_query_editor(&mut self, key: KeyEvent) -> Result<()> {
         // Comandos que funcionam em ambos os modos
@@ -83,8 +104,14 @@ impl App {
             KeyCode::Enter => {
                 self.completion.hide();
                 self.save_undo_state();
+                let indent = self.get_current_line_indent();
                 self.query.insert(self.cursor_pos, '\n');
                 self.cursor_pos += 1;
+                // Insert the same indentation on the new line
+                for c in indent.chars() {
+                    self.query.insert(self.cursor_pos, c);
+                    self.cursor_pos += 1;
+                }
             }
             // Tab = accept completion OR insert 4 spaces
             KeyCode::Tab => {
@@ -520,6 +547,7 @@ impl App {
             // New line below
             KeyCode::Char('o') => {
                 self.save_undo_state();
+                let indent = self.get_current_line_indent();
                 let text_after: String = self.query.chars().skip(self.cursor_pos).collect();
                 let line_end = if let Some(next_newline) = text_after.find('\n') {
                     self.cursor_pos + next_newline
@@ -528,19 +556,29 @@ impl App {
                 };
                 self.query.insert(line_end, '\n');
                 self.cursor_pos = line_end + 1;
+                // Insert the same indentation on the new line
+                for c in indent.chars() {
+                    self.query.insert(self.cursor_pos, c);
+                    self.cursor_pos += 1;
+                }
                 self.input_mode = InputMode::Insert;
             }
             // New line above
             KeyCode::Char('O') => {
                 self.save_undo_state();
+                let indent = self.get_current_line_indent();
                 let text_before: String = self.query.chars().take(self.cursor_pos).collect();
                 let line_start = if let Some(last_newline) = text_before.rfind('\n') {
                     last_newline + 1
                 } else {
                     0
                 };
-                self.query.insert(line_start, '\n');
-                self.cursor_pos = line_start;
+                // Insert indentation first, then newline
+                for c in indent.chars() {
+                    self.query.insert(line_start, c);
+                }
+                self.query.insert(line_start + indent.len(), '\n');
+                self.cursor_pos = line_start + indent.len();
                 self.input_mode = InputMode::Insert;
             }
             // Change character
