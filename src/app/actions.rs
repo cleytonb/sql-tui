@@ -14,45 +14,6 @@ use tokio::sync::Mutex;
 use rust_i18n::t;
 
 impl App {
-    /// Execute the default query on startup
-    pub async fn execute_default_query(&mut self) {
-        if self.query.is_empty() || !self.is_connected() {
-            return;
-        }
-
-        let client_arc = self.db().client();
-        let mut client = client_arc.lock().await;
-        let database = self.db().config.database.clone();
-
-        match crate::db::QueryExecutor::execute(&mut client, &self.query).await {
-            Ok(result) => {
-                let row_count = result.row_count;
-                let exec_time = result.execution_time.as_millis() as u64;
-
-                self.history.add(
-                    self.query.clone(),
-                    exec_time,
-                    Some(row_count),
-                    database,
-                );
-
-                self.message = Some(t!(
-                    "rows_returned",
-                    count = row_count,
-                    time = format!("{:.2}", result.execution_time.as_secs_f64() * 1000.0)
-                ).to_string());
-
-                self.result = result;
-                self.results_selected = 0;
-                self.results_col_selected = 0;
-                self.results_col_scroll = 0;
-            }
-            Err(e) => {
-                self.error = Some(e.to_string());
-            }
-        }
-    }
-
     /// Load schema tree from database
     pub async fn load_schema(&mut self) -> Result<()> {
         if !self.is_connected() {

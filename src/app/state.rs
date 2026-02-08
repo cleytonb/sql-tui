@@ -248,10 +248,7 @@ impl App {
         };
 
         let is_connected = db.is_some();
-
-        // Default query for quick testing
-        let default_query = "SELECT TOP 10 * FROM sys.tables".to_string();
-        let cursor_pos = default_query.len();
+        let cursor_pos = 0;
 
         let mut app = Self {
             db,
@@ -261,7 +258,7 @@ impl App {
             connection_form: ConnectionForm::new_empty(),
             connection_form_focus: 0,
             connection_modal_focus: ConnectionModalFocus::List,
-            query: default_query,
+            query: String::new(), 
             cursor_pos,
             query_scroll_x: 0,
             query_scroll_y: 0,
@@ -304,12 +301,11 @@ impl App {
             pending_scroll: 0,
         };
 
-        // If connected, load schema and execute default query
+        // If connected, load schema
         if is_connected {
             let _ = app.load_schema().await;
             // Start loading columns in background for autocomplete
             app.start_column_loading();
-            app.execute_default_query().await;
         }
 
         Ok(app)
