@@ -1,6 +1,7 @@
 //! Query editor keyboard handlers
 
 use crate::app::{App, InputMode};
+use crate::completion::{extract_context, get_candidates};
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
@@ -42,26 +43,78 @@ impl App {
 
     /// Handle Insert mode - normal typing
     fn handle_insert_mode(&mut self, key: KeyEvent) -> Result<()> {
+        // Handle completion navigation first if visible
+        if self.completion.visible {
+            match key.code {
+                // Navigate completion up
+                KeyCode::Up => {
+                    self.completion.select_prev();
+                    return Ok(());
+                }
+                // Navigate completion down
+                KeyCode::Down => {
+                    self.completion.select_next();
+                    return Ok(());
+                }
+                // Accept completion with Enter or Tab
+                KeyCode::Enter | KeyCode::Tab => {
+                    self.accept_completion();
+                    return Ok(());
+                }
+                // Close completion with Escape
+                KeyCode::Esc => {
+                    self.completion.hide();
+                    return Ok(());
+                }
+                // Continue typing - will update completion
+                _ => {}
+            }
+        }
+
         match key.code {
             KeyCode::Enter => {
+                self.completion.hide();
                 self.save_undo_state();
                 self.query.insert(self.cursor_pos, '\n');
                 self.cursor_pos += 1;
             }
-            // Tab = insert 4 spaces for indentation
+            // Tab = trigger completion OR insert 4 spaces
             KeyCode::Tab => {
-                self.save_undo_state();
-                let indent = "    "; // 4 spaces
-                for c in indent.chars() {
-                    self.query.insert(self.cursor_pos, c);
-                    self.cursor_pos += 1;
+                if self.completion.visible {
+                    self.accept_completion();
+                } else {
+                    self.trigger_completion();
                 }
             }
-            // Typing
+            // Ctrl+Space = force trigger completion
+            KeyCode::Char(' ') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                self.trigger_completion();
+            }
+            // Escape = close completion or go to normal mode
+            KeyCode::Esc => {
+                if self.completion.visible {
+                    self.completion.hide();
+                } else {
+                    self.input_mode = InputMode::Normal;
+                }
+            }
+            // Typing "." triggers completion automatically
+            KeyCode::Char('.') => {
+                self.save_undo_state();
+                self.query.insert(self.cursor_pos, '.');
+                self.cursor_pos += 1;
+                // Trigger completion after schema.
+                self.trigger_completion();
+            }
+            // Regular typing
             KeyCode::Char(c) => {
                 self.save_undo_state();
                 self.query.insert(self.cursor_pos, c);
                 self.cursor_pos += 1;
+                // Update completion if visible
+                if self.completion.visible {
+                    self.update_completion();
+                }
             }
             // Backspace
             KeyCode::Backspace => {
@@ -69,6 +122,10 @@ impl App {
                     self.save_undo_state();
                     self.cursor_pos -= 1;
                     self.query.remove(self.cursor_pos);
+                    // Update or hide completion
+                    if self.completion.visible {
+                        self.update_completion();
+                    }
                 }
             }
             // Delete
@@ -80,18 +137,23 @@ impl App {
             }
             // Arrow keys for cursor movement
             KeyCode::Left => {
+                self.completion.hide();
                 self.cursor_pos = self.cursor_pos.saturating_sub(1);
             }
             KeyCode::Right => {
+                self.completion.hide();
                 self.cursor_pos = (self.cursor_pos + 1).min(self.query.len());
             }
             KeyCode::Up => {
+                self.completion.hide();
                 self.move_cursor_up();
             }
             KeyCode::Down => {
+                self.completion.hide();
                 self.move_cursor_down();
             }
             KeyCode::Home => {
+                self.completion.hide();
                 // Go to start of current line
                 let text_before: String = self.query.chars().take(self.cursor_pos).collect();
                 if let Some(last_newline) = text_before.rfind('\n') {
@@ -101,6 +163,7 @@ impl App {
                 }
             }
             KeyCode::End => {
+                self.completion.hide();
                 // Go to end of current line
                 let text_after: String = self.query.chars().skip(self.cursor_pos).collect();
                 if let Some(next_newline) = text_after.find('\n') {
@@ -112,6 +175,100 @@ impl App {
             _ => {}
         }
         Ok(())
+    }
+
+    /// Trigger autocomplete at current cursor position
+    fn trigger_completion(&mut self) {
+        let context = extract_context(&self.query, self.cursor_pos);
+        
+        // Get prefix for filtering (text after last separator)
+        let prefix = self.get_completion_prefix();
+        
+        let candidates = get_candidates(&context, &self.schema_tree, &prefix);
+        
+        if candidates.is_empty() {
+            self.completion.hide();
+        } else {
+            self.completion.show(candidates, self.cursor_pos, prefix);
+        }
+    }
+
+    /// Update completion while typing
+    fn update_completion(&mut self) {
+        let prefix = self.get_completion_prefix();
+        
+        // Check if we're right after a dot (e.g., "pmt.")
+        let after_dot = self.cursor_pos > 0 && 
+            self.query.chars().nth(self.cursor_pos - 1) == Some('.');
+        
+        // If prefix is empty but we're after a dot, re-trigger full completion
+        if prefix.is_empty() {
+            if after_dot {
+                // Re-trigger completion for schema. context
+                self.trigger_completion();
+            } else {
+                self.completion.hide();
+            }
+            return;
+        }
+        
+        // If we still have items that match, filter them
+        let context = extract_context(&self.query, self.cursor_pos);
+        let candidates = get_candidates(&context, &self.schema_tree, &prefix);
+        
+        if candidates.is_empty() {
+            self.completion.hide();
+        } else {
+            self.completion.show(candidates, self.cursor_pos - prefix.len(), prefix);
+        }
+    }
+
+    /// Get the prefix being typed for completion (word at cursor)
+    fn get_completion_prefix(&self) -> String {
+        let before_cursor = &self.query[..self.cursor_pos];
+        let chars: Vec<char> = before_cursor.chars().collect();
+        
+        if chars.is_empty() {
+            return String::new();
+        }
+        
+        let mut start = chars.len();
+        
+        // Walk backwards to find word start
+        for i in (0..chars.len()).rev() {
+            let c = chars[i];
+            if c.is_alphanumeric() || c == '_' {
+                start = i;
+            } else {
+                break;
+            }
+        }
+        
+        chars[start..].iter().collect()
+    }
+
+    /// Accept the currently selected completion
+    fn accept_completion(&mut self) {
+        if let Some(item) = self.completion.get_selected().cloned() {
+            self.save_undo_state();
+            
+            // Remove the prefix that was already typed
+            let prefix_len = self.completion.prefix.len();
+            for _ in 0..prefix_len {
+                if self.cursor_pos > 0 {
+                    self.cursor_pos -= 1;
+                    self.query.remove(self.cursor_pos);
+                }
+            }
+            
+            // Insert the completion text
+            for c in item.insert_text.chars() {
+                self.query.insert(self.cursor_pos, c);
+                self.cursor_pos += 1;
+            }
+            
+            self.completion.hide();
+        }
     }
 
     /// Handle Normal mode - vim commands

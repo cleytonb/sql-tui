@@ -3,6 +3,7 @@
 //! This module contains the main App struct and related types.
 //! Business logic and async operations are in the actions module.
 
+use crate::completion::CompletionState;
 use crate::config::{AppConfig, ConnectionConfig, ConnectionForm};
 use crate::db::{DbConnection, QueryResult};
 use crate::app::{QueryHistory, UndoManager};
@@ -130,6 +131,8 @@ pub struct App {
     pub last_char_search: Option<(char, bool, bool)>,
     /// Pending operator waiting for character input (f, F, t, T)
     pub pending_char_search: Option<char>,
+    /// Autocomplete state
+    pub completion: CompletionState,
 
     // === Query Execution ===
     /// Current query result
@@ -246,6 +249,7 @@ impl App {
             visual_anchor: 0,
             last_char_search: None,
             pending_char_search: None,
+            completion: CompletionState::new(),
             result: QueryResult::empty(),
             is_loading: false,
             pending_query: None,

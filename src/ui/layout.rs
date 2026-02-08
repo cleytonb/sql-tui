@@ -1,7 +1,7 @@
 //! Layout management
 
 use crate::app::{App, ActivePanel, SPINNER_FRAMES};
-use crate::ui::{DefaultTheme, draw_query_editor, draw_results_table, draw_schema_explorer, draw_history_panel};
+use crate::ui::{DefaultTheme, draw_query_editor, draw_results_table, draw_schema_explorer, draw_history_panel, draw_completion_popup};
 use ratatui::prelude::*;
 use ratatui::widgets::{Block, Borders, Paragraph, Clear};
 
@@ -137,6 +137,11 @@ fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
     draw_results_table(f, app, left_chunks[1], is_results_active);
     draw_schema_explorer(f, app, right_chunks[0], is_schema_active);
     draw_history_panel(f, app, right_chunks[1], is_history_active);
+    
+    // Draw completion popup over the query editor (must be after query editor)
+    if is_query_active && app.completion.visible {
+        draw_completion_popup(f, app, left_chunks[0]);
+    }
 }
 
 /// Draw the status bar
