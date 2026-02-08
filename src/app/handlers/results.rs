@@ -12,12 +12,18 @@ impl App {
             // Tab switching with number keys 1, 2, 3
             KeyCode::Char('1') => {
                 self.results_tab = ResultsTab::Data;
+                self.results_scroll = 0;
+                self.results_selected = 0;
             }
             KeyCode::Char('2') => {
                 self.results_tab = ResultsTab::Columns;
+                self.results_scroll = 0;
+                self.results_selected = 0;
             }
             KeyCode::Char('3') => {
                 self.results_tab = ResultsTab::Stats;
+                self.results_scroll = 0;
+                self.results_selected = 0;
             }
             // Tab switching with Tab key
             KeyCode::Tab => {
@@ -26,6 +32,8 @@ impl App {
                     ResultsTab::Columns => ResultsTab::Stats,
                     ResultsTab::Stats => ResultsTab::Data,
                 };
+                self.results_scroll = 0;
+                self.results_selected = 0;
             }
             KeyCode::Char('d') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 self.pending_scroll += 10;
