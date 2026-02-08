@@ -196,6 +196,38 @@ fn resolve_dot_context(word_before: &str, before_upper: &str, tables: &[TableRef
     }
 }
 
+/// Find the start of the current SQL statement containing the cursor.
+/// Splits on statement-starting keywords (SELECT, INSERT, UPDATE, DELETE, EXEC, WITH, CREATE, ALTER, DROP)
+/// that appear at the beginning of a line (after optional whitespace).
+fn find_current_statement_start(query: &str, cursor_pos: usize) -> usize {
+    let before = &query[..cursor_pos.min(query.len())];
+
+    // Walk backwards through lines to find the last statement-starting keyword
+    let statement_starters = [
+        "SELECT", "INSERT", "UPDATE", "DELETE", "EXEC", "EXECUTE",
+        "WITH", "CREATE", "ALTER", "DROP", "DECLARE", "BEGIN",
+    ];
+
+    let mut last_start = 0;
+    let mut pos = 0;
+
+    for line in before.split('\n') {
+        let trimmed = line.trim_start().to_uppercase();
+        for starter in &statement_starters {
+            if trimmed.starts_with(starter) {
+                // Check it's a word boundary (next char is space, newline, or end)
+                let after = &trimmed[starter.len()..];
+                if after.is_empty() || after.starts_with(char::is_whitespace) || after.starts_with('(') {
+                    last_start = pos;
+                }
+            }
+        }
+        pos += line.len() + 1; // +1 for the '\n'
+    }
+
+    last_start
+}
+
 /// Extract the SQL context at the given cursor position
 pub fn extract_context(query: &str, cursor_pos: usize) -> SqlContext {
     let before_cursor = if cursor_pos <= query.len() {
@@ -203,12 +235,16 @@ pub fn extract_context(query: &str, cursor_pos: usize) -> SqlContext {
     } else {
         query
     };
-    
+
     let before_upper = before_cursor.to_uppercase();
     let trimmed = before_cursor.trim_end();
-    
-    // Extract tables referenced in the query (for column suggestions)
-    let tables = extract_table_references(query);
+
+    // Isolate the current SQL statement to avoid mixing table refs from different statements
+    let stmt_start = find_current_statement_start(query, cursor_pos);
+    let current_statement = &query[stmt_start..];
+
+    // Extract tables referenced only in the current statement
+    let tables = extract_table_references(current_statement);
     
     // === PRIORITY 0: INSERT INTO columns context ===
     // Check this FIRST because INSERT INTO table( should suggest columns, not dot context
@@ -727,5 +763,19 @@ mod tests {
             SqlContext::AfterUpdateSet { table_ref } 
             if table_ref.table == "Contas"
         ), "Expected AfterUpdateSet, got {:?}", ctx);
+    }
+
+    #[test]
+    fn test_multiple_statements_isolates_current() {
+        // Two separate SELECT statements - cursor is in the second one after "c."
+        // Should resolve alias 'c' to Chargebacks, NOT Contas
+        let query = "SELECT *\nFROM pmt.Contas c\nWHERE c.Ativo = 1\n\nSELECT *\nFROM pmt.Chargebacks c\nWHERE c.";
+        let cursor_pos = query.len();
+        let ctx = extract_context(query, cursor_pos);
+        assert!(matches!(
+            &ctx,
+            SqlContext::AfterTableAliasDot { alias, table_ref: Some(tref) }
+            if alias == "c" && tref.table == "Chargebacks"
+        ), "Expected AfterTableAliasDot for Chargebacks, got {:?}", ctx);
     }
 }
