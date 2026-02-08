@@ -1,8 +1,8 @@
 [package]
-name = "sql_tui"
+name = "sql-tui"
 version = "1.0.0"
-edition = "2021"
-authors = ["Alrajhi Bank IT Team"]
+edition = "2024"
+authors = ["cleytonb"]
 description = "High-performance SQL Server Terminal UI"
 
 [dependencies]

@@ -40,7 +40,7 @@ fn get_candidates_internal(
         }
         SqlContext::AfterTableAliasDot { alias: _, table_ref } => {
             // Suggest columns from the referenced table
-            if let Some(ref tref) = table_ref {
+            if let Some(tref) = table_ref {
                 find_columns_for_table(tref, schema_tree, column_cache)
             } else {
                 Vec::new()

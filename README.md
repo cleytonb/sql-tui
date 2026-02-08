@@ -1,201 +1,137 @@
-# Alrajhi Bank SQL Studio
+# sql_tui
 
-High-performance SQL Server Terminal UI built with Rust for Alrajhi Bank.
+A high-performance SQL Server TUI client built with Rust. Navigate databases, write queries with vim keybindings, and explore results — all from your terminal.
+
+![Rust](https://img.shields.io/badge/Rust-000000?style=flat&logo=rust&logoColor=white)
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
 ## Features
 
-- **Beautiful TUI** - Professional corporate design with Alrajhi Bank branding
-- **Fast & Efficient** - Built in Rust for maximum performance
-- **SQL Syntax Highlighting** - Color-coded SQL keywords, strings, and numbers
-- **Schema Explorer** - Browse tables, views, and stored procedures
-- **Query History** - Persistent history with timestamps
-- **Results Table** - Scrollable with row numbers, type indicators, NULL highlighting
-- **Tabbed Results** - View Data, Columns info, and Query Stats
-- **Export** - CSV, JSON, and INSERT statement export
-- **Mouse Support** - Scroll with mouse wheel in all panels
+- **Vim-style editor** — Normal, Insert, Visual, and Command modes with motions (`w`, `b`, `e`, `f`, `t`), text objects (`iw`, `i"`, `a(`), operators (`d`, `c`, `y`), and undo/redo
+- **SQL autocomplete** — Context-aware suggestions for keywords, tables, columns, schemas, and stored procedures
+- **Schema explorer** — Browse tables, views, and procedures organized by schema
+- **Results table** — Scrollable with Data, Columns, and Stats tabs
+- **Query history** — Persistent across sessions with timestamps
+- **Export** — CSV, JSON, and INSERT statements
+- **SQL syntax highlighting** — Keywords, strings, numbers, comments
+- **Connection manager** — Save and switch between multiple SQL Server connections
+- **i18n** — English and Portuguese (pt-BR), auto-detected from system locale
+- **Mouse support** — Scroll in all panels
 
-## Quick Install
-
-### One-Liner (Recommended)
-
-```bash
-git clone https://github.com/hszkf/alrajhi-sql-tui.git && cd alrajhi-sql-tui && ./setup.sh
-```
-
-This will:
-1. Clone the repository
-2. Build the release binary
-3. Prompt for database credentials
-4. Install `atui` command
-
-### After Installation
+## Install
 
 ```bash
-atui              # Run from anywhere
-atui test         # Test database connection
-atui update       # Update to latest version
-atui config       # Change database credentials
-```
-
-### Manual Install
-
-```bash
-# 1. Clone
-git clone https://github.com/hszkf/alrajhi-sql-tui.git
-cd alrajhi-sql-tui
-
-# 2. Build
+git clone https://github.com/cleytonb/sql-tui.git
+cd sql-tui
 cargo build --release
-
-# 3. Configure (create .env file)
-cp .env.example .env
-nano .env  # Edit with your credentials
-
-# 4. Run
-source .env && ./target/release/alrajhi_sql_tui
 ```
 
-### Update
-
-```bash
-atui update
-# Or manually:
-cd ~/alrajhi-sql-tui && git pull && cargo build --release
-```
+The binary will be at `target/release/sql-tui`.
 
 ## Keyboard Shortcuts
 
 ### Global
-| Key | Action |
-|-----|--------|
-| `Ctrl+Q` | Quit application |
-| `F1` | Toggle help popup |
-| `Ctrl+Tab` | Next panel |
-| `Shift+Tab` | Previous panel |
 
-### Query Editor
 | Key | Action |
 |-----|--------|
-| `Enter` | Execute query |
-| `Shift+Enter` | New line |
-| `Tab` | Insert 4 spaces (indent) |
-| `Ctrl+F` | Format SQL |
-| `F5` | Execute query |
-| `Esc` | Clear query |
-| Arrow keys | Move cursor |
+| `Ctrl+Q` | Quit |
+| `F1` | Help |
+| `Tab` | Next panel |
+| `<Space>q` | Query editor panel |
+| `<Space>r` | Query results panel |
+| `<Space>s` | Schema explorer panel |
+| `<Space>h` | History panel |
+| `<Space>c` | Connection manager |
+
+### Query Editor — Normal Mode
+
+| Key | Action |
+|-----|--------|
+| `i` / `a` / `o` / `O` | Enter insert mode |
+| `I` / `A` | Insert at line start / end |
+| `h` `j` `k` `l` | Cursor movement |
+| `w` / `b` / `e` | Word forward / backward / end |
+| `0` / `$` | Line start / end |
+| `^` | First non-whitespace |
+| `gg` / `G` | Document start / end |
+| `f` / `F` / `t` / `T` | Find / till character |
+| `x` | Delete character |
+| `d` | Delete line |
+| `c` | Change character |
+| `v` | Visual mode |
+| `u` / `Ctrl+R` | Undo / Redo |
+| `y` | Yank |
+| `p` | Paste |
+
+### Query Editor — Insert Mode
+
+| Key | Action |
+|-----|--------|
+| `Ctrl+E` | Execute query |
+| `Tab` | Accept completion / Indent |
+| `Esc` | Back to normal mode |
 
 ### Results Panel
+
 | Key | Action |
 |-----|--------|
-| `1` / `2` / `3` | Switch to Data/Columns/Stats tab |
-| `Tab` | Cycle through tabs |
-| `j/k` or `Up/Down` | Navigate rows |
-| `h/l` or `Left/Right` | Navigate columns |
-| `PageUp/PageDown` | Fast scroll (20 rows) |
-| `Home/End` | First/Last row |
+| `1` / `2` / `3` | Data / Columns / Stats tab |
+| `j` / `k` | Navigate rows |
+| `h` / `l` | Navigate columns |
+| `PageUp` / `PageDown` | Fast scroll |
+| `Home` / `End` | First / Last row |
 | `Ctrl+Y` | Copy cell value |
-| `Ctrl+E` | Export to CSV |
-| `Ctrl+S` | Export to JSON |
+| `Ctrl+E` | Export CSV |
+| `Ctrl+S` | Export JSON |
 | `Ctrl+I` | Copy row as INSERT |
-| Mouse scroll | Scroll through results |
 
-### Schema Explorer
-| Key | Action |
-|-----|--------|
-| `Up/Down` | Navigate |
-| `Enter/Space` | Expand folder / Insert table name |
-| Mouse scroll | Scroll through schema |
+## Architecture
 
-### History Panel
-| Key | Action |
-|-----|--------|
-| `Up/Down` | Navigate |
-| `Enter` | Load query |
-| Mouse scroll | Scroll through history |
-
-## Configuration
-
-Environment variables (set in `.env` file):
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `DB_HOST` | localhost | SQL Server hostname or IP |
-| `DB_PORT` | 1433 | SQL Server port |
-| `DB_USER` | sa | Database username |
-| `DB_PASSWORD` | (empty) | Database password |
-| `DB_DATABASE` | master | Default database |
-
-Example `.env` file:
-```bash
-DB_HOST=10.200.224.42
-DB_PORT=1433
-DB_USER=your_username
-DB_PASSWORD=your_password
-DB_DATABASE=Staging
-```
-
-## Project Structure
+Event-driven async state machine using **ratatui** + **crossterm** for the TUI and **tiberius** for SQL Server connectivity over TDS.
 
 ```
 src/
-├── main.rs           # Entry point
-├── app/              # Application state & handlers
-│   ├── mod.rs
-│   ├── state.rs      # App state
-│   ├── handlers.rs   # Keyboard & mouse handlers
-│   └── history.rs    # Query history
-├── db/               # Database layer
-│   ├── mod.rs
-│   ├── connection.rs # SQL Server connection
-│   ├── query.rs      # Query execution with DATE handling
-│   └── schema.rs     # Schema explorer
-└── ui/               # User interface
-    ├── mod.rs
-    ├── theme.rs      # Alrajhi Bank colors
-    ├── layout.rs     # Panel layout
-    └── widgets.rs    # UI components with tabs
+├── main.rs                    # Entry point, terminal setup
+├── app/
+│   ├── state.rs               # Central App state (single source of truth)
+│   ├── actions.rs             # Async business logic, query execution
+│   ├── handlers/              # Event handlers per panel
+│   │   ├── query_editor.rs    # Vim modes + key handling
+│   │   ├── results.rs         # Results navigation + export
+│   │   ├── schema.rs          # Schema tree navigation
+│   │   ├── history_handler.rs # History panel
+│   │   └── connection.rs      # Connection modal
+│   ├── editor/                # Vim engine
+│   │   ├── motions.rs         # w, b, e, f, t, gg, G, etc.
+│   │   ├── operations.rs      # d, c, y operators
+│   │   └── text_objects.rs    # iw, i", a(, etc.
+│   └── undo.rs                # Undo/redo stack
+├── completion/                # SQL autocomplete engine
+│   ├── context.rs             # Cursor context parsing
+│   └── candidates.rs          # Suggestion generation
+├── db/                        # Database layer (tiberius)
+│   ├── connection.rs          # Arc<Mutex<Client>> wrapper
+│   ├── query.rs               # Query execution, type mapping
+│   └── schema.rs              # Schema/table/proc loading
+├── ui/
+│   ├── theme.rs               # Color scheme
+│   ├── layout.rs              # Panel layout
+│   └── widgets/               # One widget per panel
+└── config.rs                  # Connection config persistence
 ```
 
-## Technologies
+## Tech Stack
 
-- **ratatui 0.26** - Terminal UI framework
-- **tiberius** - SQL Server driver (TDS protocol)
-- **tokio** - Async runtime
-- **crossterm 0.27** - Cross-platform terminal handling
-- **arboard** - Clipboard support
+- [ratatui](https://github.com/ratatui/ratatui) — Terminal UI framework
+- [tiberius](https://github.com/prisma/tiberius) — SQL Server TDS driver
+- [tokio](https://tokio.rs) — Async runtime
+- [crossterm](https://github.com/crossterm-rs/crossterm) — Terminal backend
+- [rust-i18n](https://github.com/longbridge/rust-i18n) — Internationalization
 
-## Troubleshooting
+## Acknowledgments
 
-### Connection Issues
+Originally based on [alrajhi-sql-tui](https://github.com/hszkf/alrajhi-sql-tui) by [@hszkf](https://github.com/hszkf).
 
-Run the connection test:
-```bash
-atui test
-```
+## License
 
-Output shows:
-```
-  [1/3] Ping host... ✓ OK       # Host reachable
-  [2/3] Port 1433... ✗ FAILED   # Port blocked - need IP whitelisted
-  [3/3] SQL login... ✓ OK       # Credentials valid
-```
-
-**If Port test fails:**
-- Your IP needs to be whitelisted on SQL Server firewall
-- Ask DBA to allow your IP on port 1433
-
-**If SQL login fails:**
-- Check credentials: `atui config`
-
-### Build Errors
-```bash
-# Update Rust toolchain
-rustup update
-
-# Clean and rebuild
-cargo clean
-cargo build --release
-```
-
----
-Built with Rust for Alrajhi Bank IT Team
+[MIT](LICENSE)
