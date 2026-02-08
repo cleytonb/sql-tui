@@ -60,6 +60,12 @@ pub enum SqlContext {
         table_ref: TableRef,
     },
 
+    /// After "@" - suggest declared variables
+    /// Example: SET @| or WHERE @Va|
+    AfterAt {
+        variables: Vec<String>,
+    },
+
     /// General context - suggest keywords and all objects
     General {
         prefix: String,
@@ -246,6 +252,13 @@ pub fn extract_context(query: &str, cursor_pos: usize) -> SqlContext {
     // Extract tables referenced only in the current statement
     let tables = extract_table_references(current_statement);
     
+    // === PRIORITY -1: Variable context (@) ===
+    // If the user is typing after @, suggest declared variables
+    if is_in_variable_context(before_cursor) {
+        let variables = extract_declared_variables(query);
+        return SqlContext::AfterAt { variables };
+    }
+
     // === PRIORITY 0: INSERT INTO columns context ===
     // Check this FIRST because INSERT INTO table( should suggest columns, not dot context
     if let Some(table_ref) = extract_insert_table_in_columns(&before_upper, before_cursor) {
@@ -623,6 +636,65 @@ fn is_after_table_name(upper_text: &str, trimmed: &str) -> bool {
     }
 }
 
+/// Check if cursor is in a variable context (after @ with optional partial name)
+fn is_in_variable_context(before_cursor: &str) -> bool {
+    let chars: Vec<char> = before_cursor.chars().collect();
+    if chars.is_empty() {
+        return false;
+    }
+
+    // Walk backwards: if we find @ before hitting a non-identifier char, we're in variable context
+    for i in (0..chars.len()).rev() {
+        let c = chars[i];
+        if c == '@' {
+            return true;
+        }
+        if c.is_alphanumeric() || c == '_' {
+            continue;
+        }
+        // Hit a non-identifier, non-@ character
+        return false;
+    }
+    false
+}
+
+/// Extract all declared variables from the entire query text.
+/// Looks for DECLARE @VarName patterns (with or without type).
+pub fn extract_declared_variables(query: &str) -> Vec<String> {
+    let mut vars = Vec::new();
+    let upper = query.to_uppercase();
+    let mut search_pos = 0;
+
+    while let Some(decl_pos) = upper[search_pos..].find("DECLARE") {
+        let abs_pos = search_pos + decl_pos + "DECLARE".len();
+        // After DECLARE, there may be multiple variables separated by commas
+        // DECLARE @a INT, @b VARCHAR(50), @c INT
+        let remaining = &query[abs_pos..];
+
+        for part in remaining.split(',') {
+            let trimmed = part.trim();
+            if let Some(at_pos) = trimmed.find('@') {
+                let after_at = &trimmed[at_pos..];
+                // Extract @VarName (stops at space, comma, =, or end)
+                let var_name: String = after_at
+                    .chars()
+                    .take_while(|c| c.is_alphanumeric() || *c == '_' || *c == '@')
+                    .collect();
+                if var_name.len() > 1 && !vars.contains(&var_name) {
+                    vars.push(var_name);
+                }
+            } else {
+                // No more @ in this part, stop scanning this DECLARE
+                break;
+            }
+        }
+
+        search_pos = abs_pos;
+    }
+
+    vars
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -777,5 +849,34 @@ mod tests {
             SqlContext::AfterTableAliasDot { alias, table_ref: Some(tref) }
             if alias == "c" && tref.table == "Chargebacks"
         ), "Expected AfterTableAliasDot for Chargebacks, got {:?}", ctx);
+    }
+
+    #[test]
+    fn test_after_at_suggests_variables() {
+        let query = "DECLARE @Nome VARCHAR(100), @Idade INT\nSELECT @";
+        let ctx = extract_context(query, query.len());
+        assert!(matches!(
+            &ctx,
+            SqlContext::AfterAt { variables }
+            if variables.contains(&"@Nome".to_string()) && variables.contains(&"@Idade".to_string())
+        ), "Expected AfterAt with @Nome and @Idade, got {:?}", ctx);
+    }
+
+    #[test]
+    fn test_after_at_partial_name() {
+        let query = "DECLARE @CodConta INT\nWHERE @Cod";
+        let ctx = extract_context(query, query.len());
+        assert!(matches!(
+            &ctx,
+            SqlContext::AfterAt { variables }
+            if variables.contains(&"@CodConta".to_string())
+        ), "Expected AfterAt with @CodConta, got {:?}", ctx);
+    }
+
+    #[test]
+    fn test_extract_declared_variables() {
+        let query = "DECLARE @A INT, @B VARCHAR(50)\nDECLARE @C DATETIME";
+        let vars = extract_declared_variables(query);
+        assert_eq!(vars, vec!["@A".to_string(), "@B".to_string(), "@C".to_string()]);
     }
 }

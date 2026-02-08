@@ -168,7 +168,13 @@ impl App {
                 self.save_undo_state();
                 self.query.insert(self.cursor_pos, '.');
                 self.cursor_pos += 1;
-                // Trigger completion after schema.
+                self.trigger_completion();
+            }
+            // Typing "@" triggers variable completion
+            KeyCode::Char('@') => {
+                self.save_undo_state();
+                self.query.insert(self.cursor_pos, '@');
+                self.cursor_pos += 1;
                 self.trigger_completion();
             }
             // Regular typing
@@ -286,14 +292,18 @@ impl App {
     fn update_completion(&mut self) {
         let prefix = self.get_completion_prefix();
         
-        // Check if we're right after a dot (e.g., "pmt.")
-        let after_dot = self.cursor_pos > 0 && 
-            self.query.chars().nth(self.cursor_pos - 1) == Some('.');
-        
-        // If prefix is empty but we're after a dot, re-trigger full completion
+        // Check if we're right after a dot (e.g., "pmt.") or @ (e.g., "@")
+        let last_char = if self.cursor_pos > 0 {
+            self.query.chars().nth(self.cursor_pos - 1)
+        } else {
+            None
+        };
+        let after_dot = last_char == Some('.');
+        let after_at = last_char == Some('@');
+
+        // If prefix is empty but we're after a dot or @, re-trigger full completion
         if prefix.is_empty() {
-            if after_dot {
-                // Re-trigger completion for schema. context
+            if after_dot || after_at {
                 self.trigger_completion();
             } else {
                 self.completion.hide();
@@ -351,10 +361,10 @@ impl App {
         
         let mut start = chars.len();
         
-        // Walk backwards to find word start
+        // Walk backwards to find word start (include @ for variable names)
         for i in (0..chars.len()).rev() {
             let c = chars[i];
-            if c.is_alphanumeric() || c == '_' {
+            if c.is_alphanumeric() || c == '_' || c == '@' {
                 start = i;
             } else {
                 break;

@@ -109,8 +109,9 @@ pub fn draw_completion_popup(f: &mut Frame, app: &App, editor_area: Rect) {
                 CompletionKind::Procedure => "P",
                 CompletionKind::Column => "C",
                 CompletionKind::Function => "F",
+                CompletionKind::Variable => "@",
             };
-            
+
             let kind_color = match item.kind {
                 CompletionKind::ColumnList => DefaultTheme::SUCCESS,
                 CompletionKind::Keyword => DefaultTheme::KEYWORD,
@@ -120,6 +121,7 @@ pub fn draw_completion_popup(f: &mut Frame, app: &App, editor_area: Rect) {
                 CompletionKind::Procedure => DefaultTheme::GOLD,
                 CompletionKind::Column => DefaultTheme::TEXT_DIM,
                 CompletionKind::Function => DefaultTheme::FUNCTION,
+                CompletionKind::Variable => DefaultTheme::GOLD,
             };
             
             // Create spans for the item

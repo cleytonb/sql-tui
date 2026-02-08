@@ -93,6 +93,11 @@ fn get_candidates_internal(
             // Suggest individual columns for UPDATE SET
             find_columns_for_table(table_ref, schema_tree, column_cache)
         }
+        SqlContext::AfterAt { variables } => {
+            variables.iter().map(|v| {
+                CompletionItem::new(v.clone(), CompletionKind::Variable)
+            }).collect()
+        }
         SqlContext::General { prefix: _ } => {
             let mut items = sql_keywords();
             items.extend(find_all_objects(schema_tree));

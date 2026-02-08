@@ -152,6 +152,8 @@ pub enum CompletionKind {
     Column,
     /// SQL function
     Function,
+    /// SQL variable (@Var)
+    Variable,
 }
 
 impl CompletionKind {
@@ -166,6 +168,7 @@ impl CompletionKind {
             CompletionKind::Procedure => " ",
             CompletionKind::Column => " ",
             CompletionKind::Function => "󰊕 ",
+            CompletionKind::Variable => "󰫧 ",
         }
     }
 
@@ -180,6 +183,7 @@ impl CompletionKind {
             CompletionKind::Procedure => "sp",
             CompletionKind::Column => "cl",
             CompletionKind::Function => "fn",
+            CompletionKind::Variable => "vr",
         }
     }
 }
