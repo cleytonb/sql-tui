@@ -8,8 +8,8 @@
 mod context;
 mod candidates;
 
-pub use context::{SqlContext, ObjectHint, extract_context};
-pub use candidates::get_candidates;
+pub use context::{SqlContext, ObjectHint, TableRef, extract_context};
+pub use candidates::{get_candidates, get_candidates_with_columns};
 
 /// Completion state for the query editor
 #[derive(Clone, Debug, Default)]

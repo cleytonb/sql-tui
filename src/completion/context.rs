@@ -3,6 +3,14 @@
 //! Analyzes the SQL query text up to the cursor position to determine
 //! what kind of completions should be offered.
 
+/// Table reference found in query (for column suggestions)
+#[derive(Clone, Debug, PartialEq)]
+pub struct TableRef {
+    pub schema: Option<String>,
+    pub table: String,
+    pub alias: Option<String>,
+}
+
 /// The SQL context at the cursor position
 #[derive(Clone, Debug, PartialEq)]
 pub enum SqlContext {
@@ -11,6 +19,13 @@ pub enum SqlContext {
     AfterSchemaDot {
         schema: String,
         object_hint: ObjectHint,
+    },
+
+    /// After "alias." or "table." - suggest columns from that table
+    /// Example: SELECT c.| FROM pmt.Customers c
+    AfterTableAliasDot {
+        alias: String,
+        table_ref: Option<TableRef>,
     },
 
     /// After EXEC or EXECUTE - suggest stored procedures
@@ -23,11 +38,15 @@ pub enum SqlContext {
 
     /// After SELECT - suggest columns, *, expressions
     /// Example: SELECT |
-    AfterSelect,
+    AfterSelect {
+        tables: Vec<TableRef>,
+    },
 
-    /// After WHERE or AND/OR - suggest column names
+    /// After WHERE or AND/OR - suggest column names from referenced tables
     /// Example: WHERE |
-    AfterWhere,
+    AfterWhere {
+        tables: Vec<TableRef>,
+    },
 
     /// General context - suggest keywords and all objects
     General {
@@ -46,6 +65,121 @@ pub enum ObjectHint {
     Any,
 }
 
+/// Represents the current SQL clause we're in
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum CurrentClause {
+    Select,
+    From,
+    Join,
+    Where,
+    And,
+    Or,
+    On,
+    OrderBy,
+    GroupBy,
+    Having,
+    Set,
+    Exec,
+    Unknown,
+}
+
+/// Detect which clause we're currently in based on the last significant keyword
+fn detect_current_clause(upper_text: &str) -> CurrentClause {
+    // List of clause keywords with their positions (keyword, position, clause type)
+    let clause_keywords: &[(&str, CurrentClause)] = &[
+        ("SELECT ", CurrentClause::Select),
+        ("FROM ", CurrentClause::From),
+        ("INNER JOIN ", CurrentClause::Join),
+        ("LEFT JOIN ", CurrentClause::Join),
+        ("RIGHT JOIN ", CurrentClause::Join),
+        ("FULL JOIN ", CurrentClause::Join),
+        ("CROSS JOIN ", CurrentClause::Join),
+        ("JOIN ", CurrentClause::Join),
+        ("WHERE ", CurrentClause::Where),
+        (" AND ", CurrentClause::And),
+        (" OR ", CurrentClause::Or),
+        (" ON ", CurrentClause::On),
+        ("ORDER BY ", CurrentClause::OrderBy),
+        ("GROUP BY ", CurrentClause::GroupBy),
+        ("HAVING ", CurrentClause::Having),
+        ("SET ", CurrentClause::Set),
+        ("EXEC ", CurrentClause::Exec),
+        ("EXECUTE ", CurrentClause::Exec),
+    ];
+    
+    // Find the last occurrence of each keyword
+    let mut last_pos: Option<usize> = None;
+    let mut last_clause = CurrentClause::Unknown;
+    
+    for (keyword, clause) in clause_keywords {
+        if let Some(pos) = upper_text.rfind(keyword) {
+            if last_pos.is_none() || pos > last_pos.unwrap() {
+                last_pos = Some(pos);
+                last_clause = *clause;
+            }
+        }
+    }
+    
+    last_clause
+}
+
+/// Check for dot contexts (schema.| or alias.|)
+fn check_dot_context(before_cursor: &str, before_upper: &str, tables: &[TableRef]) -> Option<SqlContext> {
+    // Check if we're right after a dot
+    if before_cursor.ends_with('.') {
+        if let Some(word_before) = extract_word_before_dot(before_cursor) {
+            return Some(resolve_dot_context(&word_before, before_upper, tables));
+        }
+    }
+    
+    // Check if there's a dot with partial text after it (alias.col| or schema.Tab|)
+    if let Some(dot_pos) = before_cursor.rfind('.') {
+        let after_dot = &before_cursor[dot_pos + 1..];
+        // If there's text after the dot (no spaces), we're still in dot context
+        if !after_dot.is_empty() && !after_dot.contains(char::is_whitespace) {
+            if let Some(word_before) = extract_word_before_dot(&before_cursor[..=dot_pos]) {
+                return Some(resolve_dot_context(&word_before, before_upper, tables));
+            }
+        }
+    }
+    
+    None
+}
+
+/// Resolve what kind of dot context this is (schema or alias/table)
+fn resolve_dot_context(word_before: &str, before_upper: &str, tables: &[TableRef]) -> SqlContext {
+    // Check if this is a table alias
+    if let Some(table_ref) = find_table_by_alias(tables, word_before) {
+        return SqlContext::AfterTableAliasDot {
+            alias: word_before.to_string(),
+            table_ref: Some(table_ref),
+        };
+    }
+    
+    // Check if it's a known table name
+    if tables.iter().any(|t| t.table.eq_ignore_ascii_case(word_before)) {
+        let table_ref = tables.iter()
+            .find(|t| t.table.eq_ignore_ascii_case(word_before))
+            .cloned();
+        return SqlContext::AfterTableAliasDot {
+            alias: word_before.to_string(),
+            table_ref,
+        };
+    }
+    
+    // Otherwise, treat as schema
+    let object_hint = if contains_exec_context(before_upper) {
+        ObjectHint::Procedure
+    } else {
+        ObjectHint::TableOrView
+    };
+    
+    SqlContext::AfterSchemaDot {
+        schema: word_before.to_string(),
+        object_hint,
+    }
+}
+
 /// Extract the SQL context at the given cursor position
 pub fn extract_context(query: &str, cursor_pos: usize) -> SqlContext {
     let before_cursor = if cursor_pos <= query.len() {
@@ -57,81 +191,150 @@ pub fn extract_context(query: &str, cursor_pos: usize) -> SqlContext {
     let before_upper = before_cursor.to_uppercase();
     let trimmed = before_cursor.trim_end();
     
-    // 1. Check if we're right after a dot (schema.)
-    if before_cursor.ends_with('.') {
-        if let Some(schema) = extract_word_before_dot(before_cursor) {
-            // Determine object hint based on context
-            let object_hint = if contains_exec_context(&before_upper) {
-                ObjectHint::Procedure
-            } else {
-                ObjectHint::TableOrView
-            };
-            
-            return SqlContext::AfterSchemaDot {
-                schema,
-                object_hint,
-            };
-        }
+    // Extract tables referenced in the query (for column suggestions)
+    let tables = extract_table_references(query);
+    
+    // === PRIORITY 1: Dot contexts (schema.| or alias.|) ===
+    // These take precedence over everything else
+    if let Some(dot_context) = check_dot_context(before_cursor, &before_upper, &tables) {
+        return dot_context;
     }
     
-    // 2. Check if there's a dot with partial text after it (schema.Tab|)
-    if let Some(dot_pos) = before_cursor.rfind('.') {
-        let after_dot = &before_cursor[dot_pos + 1..];
-        // If there's text after the dot (no spaces), we're still in schema context
-        if !after_dot.is_empty() && !after_dot.contains(char::is_whitespace) {
-            if let Some(schema) = extract_word_before_dot(&before_cursor[..=dot_pos]) {
-                let object_hint = if contains_exec_context(&before_upper) {
-                    ObjectHint::Procedure
-                } else {
-                    ObjectHint::TableOrView
-                };
-                
-                return SqlContext::AfterSchemaDot {
-                    schema,
-                    object_hint,
-                };
-            }
-        }
-    }
+    // === PRIORITY 2: Detect current clause based on last significant keyword ===
+    // This is the key insight: find what clause we're IN, not just what keyword we're AFTER
+    let current_clause = detect_current_clause(&before_upper);
     
-    // 3. Check for EXEC/EXECUTE followed by space
-    if before_upper.ends_with("EXEC ") || before_upper.ends_with("EXECUTE ") {
-        return SqlContext::AfterExec;
-    }
-    
-    // Also check if we're typing after EXEC with partial text
-    if let Some(exec_pos) = find_last_keyword(&before_upper, &["EXEC ", "EXECUTE "]) {
-        let after_exec = &before_cursor[exec_pos..].trim();
-        // If no dot yet, still in EXEC context
-        if !after_exec.contains('.') && !after_exec.contains(char::is_whitespace) {
+    match current_clause {
+        CurrentClause::Exec => {
             return SqlContext::AfterExec;
         }
-    }
-    
-    // 4. Check for SELECT without FROM yet
-    if before_upper.contains("SELECT") && !before_upper.contains("FROM") {
-        // Check if we're right after SELECT
-        if before_upper.ends_with("SELECT ") {
-            return SqlContext::AfterSelect;
+        CurrentClause::Select => {
+            return SqlContext::AfterSelect { tables: tables.clone() };
         }
-    }
-    
-    // 5. Check for WHERE context
-    if before_upper.ends_with("WHERE ") 
-        || before_upper.ends_with("AND ") 
-        || before_upper.ends_with("OR ") 
-    {
-        return SqlContext::AfterWhere;
-    }
-    
-    // 6. Check if we just finished a table name (after FROM/JOIN)
-    if is_after_table_name(&before_upper, trimmed) {
-        return SqlContext::AfterTableName;
+        CurrentClause::Where | CurrentClause::And | CurrentClause::Or | 
+        CurrentClause::On | CurrentClause::Having => {
+            // All these expect column names
+            return SqlContext::AfterWhere { tables: tables.clone() };
+        }
+        CurrentClause::From | CurrentClause::Join => {
+            // Check if we already have a table name (then suggest clauses)
+            if is_after_table_name(&before_upper, trimmed) {
+                return SqlContext::AfterTableName;
+            }
+            // Otherwise still typing table name - fall through to General
+        }
+        CurrentClause::OrderBy | CurrentClause::GroupBy => {
+            // These also expect column names
+            return SqlContext::AfterWhere { tables: tables.clone() };
+        }
+        CurrentClause::Set => {
+            // SET expects column names
+            return SqlContext::AfterWhere { tables: tables.clone() };
+        }
+        CurrentClause::Unknown => {
+            // Fall through to General
+        }
     }
     
     // 7. Default: general context with current prefix
     let prefix = extract_current_word(before_cursor);
     SqlContext::General { prefix }
+}
+
+/// Extract table references from the query (FROM and JOIN clauses)
+fn extract_table_references(query: &str) -> Vec<TableRef> {
+    let mut tables = Vec::new();
+    let upper = query.to_uppercase();
+    
+    // Simple regex-like parsing for FROM and JOIN clauses
+    // Pattern: FROM|JOIN schema.table [AS] alias
+    //          FROM|JOIN table [AS] alias
+    
+    let keywords = ["FROM ", "JOIN ", "INNER JOIN ", "LEFT JOIN ", "RIGHT JOIN ", "FULL JOIN ", "CROSS JOIN "];
+    
+    for keyword in keywords {
+        let mut search_pos = 0;
+        while let Some(kw_pos) = upper[search_pos..].find(keyword) {
+            let start = search_pos + kw_pos + keyword.len();
+            if let Some(table_ref) = parse_table_reference(&query[start..]) {
+                // Avoid duplicates
+                if !tables.iter().any(|t: &TableRef| {
+                    t.table.eq_ignore_ascii_case(&table_ref.table) && t.schema == table_ref.schema
+                }) {
+                    tables.push(table_ref);
+                }
+            }
+            search_pos = start;
+        }
+    }
+    
+    tables
+}
+
+/// Parse a table reference from text like "schema.table alias" or "table AS alias"
+fn parse_table_reference(text: &str) -> Option<TableRef> {
+    let text = text.trim();
+    if text.is_empty() {
+        return None;
+    }
+    
+    // Split by whitespace to get tokens
+    let tokens: Vec<&str> = text.split_whitespace().take(4).collect();
+    if tokens.is_empty() {
+        return None;
+    }
+    
+    let table_part = tokens[0];
+    
+    // Check for schema.table format
+    let (schema, table) = if let Some(dot_pos) = table_part.find('.') {
+        let schema = table_part[..dot_pos].trim_matches(|c| c == '[' || c == ']');
+        let table = table_part[dot_pos + 1..].trim_matches(|c| c == '[' || c == ']');
+        (Some(schema.to_string()), table.to_string())
+    } else {
+        let table = table_part.trim_matches(|c| c == '[' || c == ']');
+        (None, table.to_string())
+    };
+    
+    // Stop if we hit a keyword
+    let stop_keywords = ["WHERE", "ORDER", "GROUP", "HAVING", "ON", "SET", "VALUES", "(", ")", ","];
+    if stop_keywords.contains(&table.to_uppercase().as_str()) {
+        return None;
+    }
+    
+    // Look for alias (second token, or after AS)
+    let alias = if tokens.len() > 1 {
+        let next = tokens[1].to_uppercase();
+        if next == "AS" && tokens.len() > 2 {
+            // Skip AS, get the alias
+            let alias = tokens[2].trim_matches(|c| c == '[' || c == ']');
+            if !stop_keywords.contains(&alias.to_uppercase().as_str()) {
+                Some(alias.to_string())
+            } else {
+                None
+            }
+        } else if !stop_keywords.contains(&next.as_str()) 
+            && !["WHERE", "ORDER", "GROUP", "HAVING", "ON", "INNER", "LEFT", "RIGHT", "FULL", "CROSS", "JOIN", "SET", "AND", "OR"].contains(&next.as_str()) 
+        {
+            let alias = tokens[1].trim_matches(|c| c == '[' || c == ']');
+            Some(alias.to_string())
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+    
+    Some(TableRef { schema, table, alias })
+}
+
+/// Find a table reference by its alias
+fn find_table_by_alias(tables: &[TableRef], alias: &str) -> Option<TableRef> {
+    tables.iter()
+        .find(|t| {
+            t.alias.as_ref().map(|a| a.eq_ignore_ascii_case(alias)).unwrap_or(false)
+        })
+        .cloned()
 }
 
 /// Extract the word immediately before a dot
@@ -201,14 +404,6 @@ fn contains_exec_context(upper_text: &str) -> bool {
         (Some(_), None) => true,
         _ => false,
     }
-}
-
-/// Find the position after the last occurrence of any of the given keywords
-fn find_last_keyword(text: &str, keywords: &[&str]) -> Option<usize> {
-    keywords
-        .iter()
-        .filter_map(|kw| text.rfind(kw).map(|pos| pos + kw.len()))
-        .max()
 }
 
 /// Check if cursor is right after a table name (for suggesting WHERE, JOIN, etc.)

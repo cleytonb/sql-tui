@@ -2,18 +2,49 @@
 //!
 //! Generates completion candidates based on SQL context and database schema.
 
-use super::{CompletionItem, CompletionKind, SqlContext, ObjectHint};
+use super::{CompletionItem, CompletionKind, SqlContext, ObjectHint, TableRef};
 use crate::app::{SchemaNode, SchemaNodeType};
+use crate::db::ColumnDef;
+use std::collections::HashMap;
 
-/// Generate completion candidates based on context
+/// Generate completion candidates based on context (sync version for non-column contexts)
 pub fn get_candidates(
     context: &SqlContext,
     schema_tree: &[SchemaNode],
     prefix: &str,
 ) -> Vec<CompletionItem> {
+    // For contexts that don't need columns, use the sync version
+    get_candidates_internal(context, schema_tree, prefix, &HashMap::new())
+}
+
+/// Generate completion candidates with column cache access
+pub fn get_candidates_with_columns(
+    context: &SqlContext,
+    schema_tree: &[SchemaNode],
+    prefix: &str,
+    column_cache: &HashMap<(String, String), Vec<ColumnDef>>,
+) -> Vec<CompletionItem> {
+    get_candidates_internal(context, schema_tree, prefix, column_cache)
+}
+
+/// Internal implementation that handles all contexts
+fn get_candidates_internal(
+    context: &SqlContext,
+    schema_tree: &[SchemaNode],
+    prefix: &str,
+    column_cache: &HashMap<(String, String), Vec<ColumnDef>>,
+) -> Vec<CompletionItem> {
     let mut items = match context {
         SqlContext::AfterSchemaDot { schema, object_hint } => {
             find_objects_in_schema(schema_tree, schema, *object_hint)
+        }
+        SqlContext::AfterTableAliasDot { alias: _, table_ref } => {
+            // Suggest columns from the referenced table
+            if let Some(ref tref) = table_ref {
+                find_columns_for_table(tref, schema_tree, column_cache)
+            } else {
+                Vec::new()
+            }
         }
         SqlContext::AfterExec => {
             // All procedures with schema prefix
@@ -22,19 +53,22 @@ pub fn get_candidates(
         SqlContext::AfterTableName => {
             sql_clause_keywords()
         }
-        SqlContext::AfterSelect => {
+        SqlContext::AfterSelect { tables } => {
             let mut items = vec![
                 CompletionItem::new("*", CompletionKind::Keyword),
                 CompletionItem::new("TOP", CompletionKind::Keyword),
                 CompletionItem::new("DISTINCT", CompletionKind::Keyword),
             ];
+            // Add columns from all referenced tables
+            for table_ref in tables {
+                items.extend(find_columns_for_table(table_ref, schema_tree, column_cache));
+            }
             // Also add common functions
             items.extend(sql_functions());
             items
         }
-        SqlContext::AfterWhere => {
-            // Operators and common patterns
-            vec![
+        SqlContext::AfterWhere { tables } => {
+            let mut items = vec![
                 CompletionItem::new("AND", CompletionKind::Keyword),
                 CompletionItem::new("OR", CompletionKind::Keyword),
                 CompletionItem::new("NOT", CompletionKind::Keyword),
@@ -44,7 +78,12 @@ pub fn get_candidates(
                 CompletionItem::new("IS NULL", CompletionKind::Keyword),
                 CompletionItem::new("IS NOT NULL", CompletionKind::Keyword),
                 CompletionItem::new("EXISTS", CompletionKind::Keyword),
-            ]
+            ];
+            // Add columns from all referenced tables
+            for table_ref in tables {
+                items.extend(find_columns_for_table(table_ref, schema_tree, column_cache));
+            }
+            items
         }
         SqlContext::General { prefix: _ } => {
             let mut items = sql_keywords();
@@ -61,15 +100,75 @@ pub fn get_candidates(
         });
     }
     
-    // Sort: keywords first, then by label
+    // Sort: columns first when in column context, then keywords, then by label
     items.sort_by(|a, b| {
         match (&a.kind, &b.kind) {
+            (CompletionKind::Column, CompletionKind::Column) => a.label.cmp(&b.label),
+            (CompletionKind::Column, _) => std::cmp::Ordering::Less,
+            (_, CompletionKind::Column) => std::cmp::Ordering::Greater,
             (CompletionKind::Keyword, CompletionKind::Keyword) => a.label.cmp(&b.label),
             (CompletionKind::Keyword, _) => std::cmp::Ordering::Less,
             (_, CompletionKind::Keyword) => std::cmp::Ordering::Greater,
             _ => a.label.cmp(&b.label),
         }
     });
+    
+    items
+}
+
+/// Find columns for a specific table reference using the cache
+fn find_columns_for_table(
+    table_ref: &TableRef,
+    schema_tree: &[SchemaNode],
+    column_cache: &HashMap<(String, String), Vec<ColumnDef>>,
+) -> Vec<CompletionItem> {
+    let mut items = Vec::new();
+    
+    // If we have schema info, use it directly
+    if let Some(ref schema) = table_ref.schema {
+        let key = (schema.clone(), table_ref.table.clone());
+        if let Some(columns) = column_cache.get(&key) {
+            for col in columns {
+                let detail = format!("{} ({})", col.data_type, if col.is_nullable { "NULL" } else { "NOT NULL" });
+                items.push(CompletionItem {
+                    label: col.name.clone(),
+                    kind: CompletionKind::Column,
+                    insert_text: col.name.clone(),
+                    detail: Some(detail),
+                });
+            }
+            return items;
+        }
+    }
+    
+    // If no schema provided, search all schemas for this table
+    for root_folder in schema_tree {
+        if root_folder.name != "Tables" && root_folder.name != "Views" {
+            continue;
+        }
+        
+        for schema_folder in &root_folder.children {
+            let schema_name = &schema_folder.name;
+            
+            for obj in &schema_folder.children {
+                if obj.name.eq_ignore_ascii_case(&table_ref.table) {
+                    let key = (schema_name.clone(), obj.name.clone());
+                    if let Some(columns) = column_cache.get(&key) {
+                        for col in columns {
+                            let detail = format!("{} ({})", col.data_type, if col.is_nullable { "NULL" } else { "NOT NULL" });
+                            items.push(CompletionItem {
+                                label: col.name.clone(),
+                                kind: CompletionKind::Column,
+                                insert_text: col.name.clone(),
+                                detail: Some(detail),
+                            });
+                        }
+                        return items;
+                    }
+                }
+            }
+        }
+    }
     
     items
 }

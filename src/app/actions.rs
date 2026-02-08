@@ -3,12 +3,14 @@
 //! This module contains the core actions that modify application state,
 //! including query execution, schema loading, and other async operations.
 
-use crate::app::{App, ActivePanel, InputMode, SchemaNode, SchemaNodeType};
+use crate::app::{App, ActivePanel, InputMode, SchemaNode, SchemaNodeType, ColumnCache};
 use crate::sql::format_sql_query;
 use crate::db::SchemaExplorer;
 use anyhow::Result;
 use std::collections::HashMap;
+use std::sync::Arc;
 use tokio::sync::oneshot;
+use tokio::sync::Mutex;
 
 impl App {
     /// Execute the default query on startup
@@ -142,6 +144,67 @@ impl App {
         self.schema_tree = vec![tables_folder, views_folder, procs_folder];
 
         Ok(())
+    }
+
+    /// Start loading columns in background for autocomplete
+    /// This spawns a background task that loads columns for all tables/views
+    pub fn start_column_loading(&mut self) {
+        if !self.is_connected() || self.columns_loading {
+            return;
+        }
+
+        self.columns_loading = true;
+
+        // Collect all tables and views from schema_tree
+        let mut tables_to_load: Vec<(String, String)> = Vec::new();
+        
+        for root_folder in &self.schema_tree {
+            // Only load columns for Tables and Views folders
+            if root_folder.name != "Tables" && root_folder.name != "Views" {
+                continue;
+            }
+            
+            for schema_folder in &root_folder.children {
+                let schema_name = &schema_folder.name;
+                for obj in &schema_folder.children {
+                    if obj.node_type == SchemaNodeType::Table || obj.node_type == SchemaNodeType::View {
+                        tables_to_load.push((schema_name.clone(), obj.name.clone()));
+                    }
+                }
+            }
+        }
+
+        let client_arc = self.db().client();
+        let column_cache = Arc::clone(&self.column_cache);
+
+        // Spawn background task to load all columns
+        tokio::spawn(async move {
+            Self::load_columns_background(client_arc, column_cache, tables_to_load).await;
+        });
+    }
+
+    /// Background task to load columns for all tables/views
+    async fn load_columns_background(
+        client: Arc<Mutex<tiberius::Client<tokio_util::compat::Compat<tokio::net::TcpStream>>>>,
+        column_cache: ColumnCache,
+        tables: Vec<(String, String)>,
+    ) {
+        for (schema, table) in tables {
+            // Lock client, load columns, release lock quickly
+            let columns = {
+                let mut client_guard = client.lock().await;
+                SchemaExplorer::get_columns(&mut client_guard, &schema, &table).await
+            };
+
+            if let Ok(cols) = columns {
+                // Insert into cache
+                let mut cache = column_cache.write().await;
+                cache.insert((schema, table), cols);
+            }
+            
+            // Small yield to not block the event loop
+            tokio::task::yield_now().await;
+        }
     }
 
     /// Start query execution (non-blocking)

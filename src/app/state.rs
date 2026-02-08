@@ -5,10 +5,18 @@
 
 use crate::completion::CompletionState;
 use crate::config::{AppConfig, ConnectionConfig, ConnectionForm};
-use crate::db::{DbConnection, QueryResult};
+use crate::db::{ColumnDef, DbConnection, QueryResult};
 use crate::app::{QueryHistory, UndoManager};
 use anyhow::Result;
-use tokio::sync::oneshot;
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::{oneshot, RwLock};
+
+/// Cache key for columns: (schema, table_or_view)
+pub type ColumnCacheKey = (String, String);
+
+/// Thread-safe column cache
+pub type ColumnCache = Arc<RwLock<HashMap<ColumnCacheKey, Vec<ColumnDef>>>>;
 
 /// Active panel in the UI
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -169,6 +177,10 @@ pub struct App {
     pub show_search_schema: bool,
     /// Search query for schema explorer
     pub schema_search_query: String,
+    /// Column cache for autocomplete (loaded in background)
+    pub column_cache: ColumnCache,
+    /// Whether columns are being loaded in background
+    pub columns_loading: bool,
 
     // === History ===
     /// Query history
@@ -265,6 +277,8 @@ impl App {
             schema_selected: 0,
             show_search_schema: false,
             schema_search_query: String::new(),
+            column_cache: Arc::new(RwLock::new(HashMap::new())),
+            columns_loading: false,
             history: QueryHistory::new(1000),
             history_selected: 0,
             undo_manager: UndoManager::new(1000),
@@ -283,6 +297,8 @@ impl App {
         // If connected, load schema and execute default query
         if is_connected {
             let _ = app.load_schema().await;
+            // Start loading columns in background for autocomplete
+            app.start_column_loading();
             app.execute_default_query().await;
         }
 
@@ -322,8 +338,9 @@ impl App {
         self.app_config.set_last_connection(&config.name);
         let _ = self.app_config.save();
         
-        // Load schema
+        // Load schema and start loading columns in background
         let _ = self.load_schema().await;
+        self.start_column_loading();
         
         Ok(())
     }

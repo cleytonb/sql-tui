@@ -1,7 +1,7 @@
 //! Query editor keyboard handlers
 
 use crate::app::{App, InputMode};
-use crate::completion::{extract_context, get_candidates};
+use crate::completion::{extract_context, get_candidates, get_candidates_with_columns};
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
@@ -51,8 +51,16 @@ impl App {
                     self.completion.select_prev();
                     return Ok(());
                 }
+                KeyCode::Char('p') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                    self.completion.select_prev();
+                    return Ok(());
+                }
                 // Navigate completion down
                 KeyCode::Down => {
+                    self.completion.select_next();
+                    return Ok(());
+                }
+                KeyCode::Char('n') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                     self.completion.select_next();
                     return Ok(());
                 }
@@ -111,8 +119,12 @@ impl App {
                 self.save_undo_state();
                 self.query.insert(self.cursor_pos, c);
                 self.cursor_pos += 1;
-                // Update completion if visible
-                if self.completion.visible {
+                
+                // After typing space, check if we should auto-trigger completion
+                if c == ' ' {
+                    self.maybe_trigger_after_keyword();
+                } else if self.completion.visible {
+                    // Update completion if visible
                     self.update_completion();
                 }
             }
@@ -184,7 +196,13 @@ impl App {
         // Get prefix for filtering (text after last separator)
         let prefix = self.get_completion_prefix();
         
-        let candidates = get_candidates(&context, &self.schema_tree, &prefix);
+        // Try to get column cache (non-blocking)
+        let candidates = if let Ok(cache) = self.column_cache.try_read() {
+            get_candidates_with_columns(&context, &self.schema_tree, &prefix, &cache)
+        } else {
+            // Cache is locked, use version without columns
+            get_candidates(&context, &self.schema_tree, &prefix)
+        };
         
         if candidates.is_empty() {
             self.completion.hide();
@@ -212,14 +230,42 @@ impl App {
             return;
         }
         
-        // If we still have items that match, filter them
+        // Always re-calculate context and get fresh candidates
+        // This ensures we keep the right context (e.g., AfterWhere with tables)
         let context = extract_context(&self.query, self.cursor_pos);
-        let candidates = get_candidates(&context, &self.schema_tree, &prefix);
+        
+        // Try to get column cache (non-blocking)
+        let candidates = if let Ok(cache) = self.column_cache.try_read() {
+            get_candidates_with_columns(&context, &self.schema_tree, &prefix, &cache)
+        } else {
+            get_candidates(&context, &self.schema_tree, &prefix)
+        };
         
         if candidates.is_empty() {
             self.completion.hide();
         } else {
             self.completion.show(candidates, self.cursor_pos - prefix.len(), prefix);
+        }
+    }
+
+    /// Check if we should auto-trigger completion after typing a space
+    /// (e.g., after WHERE, AND, OR, SELECT, FROM)
+    fn maybe_trigger_after_keyword(&mut self) {
+        let before_cursor = &self.query[..self.cursor_pos];
+        let upper = before_cursor.to_uppercase();
+        
+        // Keywords that should trigger completion when followed by space
+        let trigger_keywords = [
+            "WHERE ", "AND ", "OR ", "SELECT ", "FROM ", "JOIN ",
+            "INNER JOIN ", "LEFT JOIN ", "RIGHT JOIN ", "FULL JOIN ",
+            "ORDER BY ", "GROUP BY ", "HAVING ", "ON ", "SET ",
+        ];
+        
+        for keyword in trigger_keywords {
+            if upper.ends_with(keyword) {
+                self.trigger_completion();
+                return;
+            }
         }
     }
 
