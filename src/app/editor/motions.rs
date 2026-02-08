@@ -2,7 +2,27 @@
 //!
 //! All positions (cursor_pos, return values) are **char indices**, not byte indices.
 //! This module contains functions for moving the cursor within text,
-//! implementing vim-style motions like w, b, 0, $, g, G, etc.
+//! implementing vim-style motions like w, b, e, 0, $, g, G, etc.
+
+/// Character class for vim word motions.
+/// In vim, a "word" is a sequence of word chars (alphanumeric + underscore),
+/// a sequence of punctuation (non-word, non-whitespace), or whitespace.
+#[derive(PartialEq, Eq)]
+enum CharClass {
+    Word,
+    Punct,
+    Whitespace,
+}
+
+fn char_class(c: char) -> CharClass {
+    if c.is_whitespace() {
+        CharClass::Whitespace
+    } else if c.is_alphanumeric() || c == '_' {
+        CharClass::Word
+    } else {
+        CharClass::Punct
+    }
+}
 
 /// Find the start position (char index) of the current line
 pub fn line_start(text: &str, cursor_pos: usize) -> usize {
@@ -39,55 +59,76 @@ pub fn first_non_whitespace(text: &str, cursor_pos: usize) -> usize {
     start
 }
 
-/// Move forward by one word
+/// Move forward by one word (w motion).
+/// Jumps to the start of the next word. Words are sequences of word chars
+/// (alphanumeric + underscore) or sequences of punctuation.
 pub fn word_forward(text: &str, cursor_pos: usize) -> usize {
     let chars: Vec<char> = text.chars().collect();
-    let mut pos = cursor_pos;
-
-    // Skip current word characters
-    while pos < chars.len() && chars[pos].is_alphanumeric() {
-        pos += 1;
+    if chars.is_empty() {
+        return 0;
     }
-    // Skip whitespace (but not newlines)
-    while pos < chars.len() && chars[pos].is_whitespace() && chars[pos] != '\n' {
+    let mut pos = cursor_pos;
+    let cls = char_class(chars[pos]);
+
+    // Skip current word/punct class
+    if cls != CharClass::Whitespace {
+        while pos < chars.len() && char_class(chars[pos]) == cls {
+            pos += 1;
+        }
+    }
+    // Skip whitespace
+    while pos < chars.len() && char_class(chars[pos]) == CharClass::Whitespace {
         pos += 1;
     }
 
     pos.min(chars.len().saturating_sub(1))
 }
 
-/// Move backward by one word
+/// Move backward by one word (b motion).
 pub fn word_backward(text: &str, cursor_pos: usize) -> usize {
     let chars: Vec<char> = text.chars().collect();
+    if chars.is_empty() {
+        return 0;
+    }
     let mut pos = cursor_pos.saturating_sub(1);
 
     // Skip whitespace
-    while pos > 0 && chars[pos].is_whitespace() {
+    while pos > 0 && char_class(chars[pos]) == CharClass::Whitespace {
         pos -= 1;
     }
-    // Skip word characters
-    while pos > 0 && chars[pos - 1].is_alphanumeric() {
+    // Skip current word/punct class
+    let cls = char_class(chars[pos]);
+    while pos > 0 && char_class(chars[pos - 1]) == cls {
         pos -= 1;
     }
 
     pos
 }
 
-/// Move to the end of the current word
+/// Move to the end of the current/next word (e motion).
 pub fn word_end(text: &str, cursor_pos: usize) -> usize {
     let chars: Vec<char> = text.chars().collect();
-    let mut pos = cursor_pos;
-
-    // If on whitespace, skip it first
-    while pos < chars.len() && chars[pos].is_whitespace() {
-        pos += 1;
+    if chars.is_empty() {
+        return 0;
     }
-    // Move to end of word
-    while pos < chars.len() && chars[pos].is_alphanumeric() {
-        pos += 1;
+    let mut pos = cursor_pos + 1;
+    if pos >= chars.len() {
+        return chars.len().saturating_sub(1);
     }
 
-    pos.saturating_sub(1).min(chars.len().saturating_sub(1))
+    // Skip whitespace
+    while pos < chars.len() && char_class(chars[pos]) == CharClass::Whitespace {
+        pos += 1;
+    }
+    // Skip current word/punct class
+    if pos < chars.len() {
+        let cls = char_class(chars[pos]);
+        while pos + 1 < chars.len() && char_class(chars[pos + 1]) == cls {
+            pos += 1;
+        }
+    }
+
+    pos.min(chars.len().saturating_sub(1))
 }
 
 /// Move to start of document
@@ -202,6 +243,53 @@ mod tests {
         assert_eq!(word_backward(text, 16), 12);
         assert_eq!(word_backward(text, 12), 6);
         assert_eq!(word_backward(text, 6), 0);
+    }
+
+    #[test]
+    fn test_word_forward_with_punctuation() {
+        // "SELECT * FROM pmt.Contas"
+        //  0123456789...
+        let text = "SELECT * FROM pmt.Contas";
+        // S(0) -> w -> *(7)
+        assert_eq!(word_forward(text, 0), 7);
+        // *(7) -> w -> F(9)
+        assert_eq!(word_forward(text, 7), 9);
+        // F(9) -> w -> p(14)
+        assert_eq!(word_forward(text, 9), 14);
+        // p(14) -> w -> .(17) (punct is its own word)
+        assert_eq!(word_forward(text, 14), 17);
+        // .(17) -> w -> C(18)
+        assert_eq!(word_forward(text, 17), 18);
+    }
+
+    #[test]
+    fn test_word_end_with_punctuation() {
+        let text = "SELECT * FROM pmt.Contas";
+        // S(0) -> e -> T(5)
+        assert_eq!(word_end(text, 0), 5);
+        // T(5) -> e -> *(7)
+        assert_eq!(word_end(text, 5), 7);
+        // *(7) -> e -> M(12)
+        assert_eq!(word_end(text, 7), 12);
+        // M(12) -> e -> t(16)
+        assert_eq!(word_end(text, 12), 16);
+        // t(16) -> e -> .(17)
+        assert_eq!(word_end(text, 16), 17);
+        // .(17) -> e -> s(23)
+        assert_eq!(word_end(text, 17), 23);
+    }
+
+    #[test]
+    fn test_word_backward_with_punctuation() {
+        let text = "SELECT * FROM pmt.Contas";
+        // s(23) -> b -> C(18)
+        assert_eq!(word_backward(text, 23), 18);
+        // C(18) -> b -> .(17)
+        assert_eq!(word_backward(text, 18), 17);
+        // .(17) -> b -> p(14)
+        assert_eq!(word_backward(text, 17), 14);
+        // p(14) -> b -> F(9)
+        assert_eq!(word_backward(text, 14), 9);
     }
 
     #[test]

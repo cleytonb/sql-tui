@@ -566,47 +566,20 @@ impl App {
                 }
                 self.cursor_pos = pos;
             }
-            // Word forward
+            // Word forward (w)
             KeyCode::Char('w') => {
-                let chars: Vec<char> = self.query.chars().collect();
-                let mut pos = self.cursor_pos;
-                // Skip current word characters
-                while pos < chars.len() && chars[pos].is_alphanumeric() {
-                    pos += 1;
-                }
-                // Skip whitespace
-                while pos < chars.len() && chars[pos].is_whitespace() && chars[pos] != '\n' {
-                    pos += 1;
-                }
-                self.cursor_pos = pos.min(chars.len().saturating_sub(1));
+                use crate::app::editor::motions::word_forward;
+                self.cursor_pos = word_forward(&self.query, self.cursor_pos);
             }
-            // Word backward
+            // Word backward (b)
             KeyCode::Char('b') => {
-                let chars: Vec<char> = self.query.chars().collect();
-                let mut pos = self.cursor_pos.saturating_sub(1);
-                // Skip whitespace
-                while pos > 0 && chars[pos].is_whitespace() {
-                    pos -= 1;
-                }
-                // Skip word characters
-                while pos > 0 && chars[pos - 1].is_alphanumeric() {
-                    pos -= 1;
-                }
-                self.cursor_pos = pos;
+                use crate::app::editor::motions::word_backward;
+                self.cursor_pos = word_backward(&self.query, self.cursor_pos);
             }
             // Word end forward (e)
             KeyCode::Char('e') => {
-                let chars: Vec<char> = self.query.chars().collect();
-                let mut pos = self.cursor_pos + 1;
-                // Skip whitespace
-                while pos < chars.len() && chars[pos].is_whitespace() {
-                    pos += 1;
-                }
-                // Move to end of word
-                while pos < chars.len() && chars[pos].is_alphanumeric() {
-                    pos += 1;
-                }
-                self.cursor_pos = pos.saturating_sub(1).min(chars.len().saturating_sub(1));
+                use crate::app::editor::motions::word_end;
+                self.cursor_pos = word_end(&self.query, self.cursor_pos);
             }
             // Find character forward (f)
             KeyCode::Char('f') => {
@@ -830,41 +803,20 @@ impl App {
                     self.cursor_pos = self.query.chars().count().saturating_sub(1);
                 }
             }
-            // Word forward
+            // Word forward (w)
             KeyCode::Char('w') => {
-                let chars: Vec<char> = self.query.chars().collect();
-                let mut pos = self.cursor_pos;
-                while pos < chars.len() && chars[pos].is_alphanumeric() {
-                    pos += 1;
-                }
-                while pos < chars.len() && chars[pos].is_whitespace() && chars[pos] != '\n' {
-                    pos += 1;
-                }
-                self.cursor_pos = pos.min(chars.len().saturating_sub(1));
+                use crate::app::editor::motions::word_forward;
+                self.cursor_pos = word_forward(&self.query, self.cursor_pos);
             }
-            // Word backward
+            // Word backward (b)
             KeyCode::Char('b') => {
-                let chars: Vec<char> = self.query.chars().collect();
-                let mut pos = self.cursor_pos.saturating_sub(1);
-                while pos > 0 && chars[pos].is_whitespace() {
-                    pos -= 1;
-                }
-                while pos > 0 && chars[pos - 1].is_alphanumeric() {
-                    pos -= 1;
-                }
-                self.cursor_pos = pos;
+                use crate::app::editor::motions::word_backward;
+                self.cursor_pos = word_backward(&self.query, self.cursor_pos);
             }
             // Word end forward (e)
             KeyCode::Char('e') => {
-                let chars: Vec<char> = self.query.chars().collect();
-                let mut pos = self.cursor_pos + 1;
-                while pos < chars.len() && chars[pos].is_whitespace() {
-                    pos += 1;
-                }
-                while pos < chars.len() && chars[pos].is_alphanumeric() {
-                    pos += 1;
-                }
-                self.cursor_pos = pos.saturating_sub(1).min(chars.len().saturating_sub(1));
+                use crate::app::editor::motions::word_end;
+                self.cursor_pos = word_end(&self.query, self.cursor_pos);
             }
             // Find character forward (f)
             KeyCode::Char('f') => {
