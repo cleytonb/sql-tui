@@ -67,18 +67,6 @@ impl App {
                     self.results_col_selected += 1;
                 }
             }
-            KeyCode::PageUp => {
-                self.results_selected = self.results_selected.saturating_sub(20);
-            }
-            KeyCode::PageDown => {
-                let max_rows = match self.results_tab {
-                    ResultsTab::Data => self.result.rows.len(),
-                    ResultsTab::Columns => self.result.columns.len(),
-                    ResultsTab::Stats => 10,
-                };
-                self.results_selected = (self.results_selected + 20)
-                    .min(max_rows.saturating_sub(1));
-            }
             KeyCode::Home => {
                 self.results_selected = 0;
                 self.results_col_selected = 0;

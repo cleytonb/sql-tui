@@ -78,7 +78,7 @@ The binary will be at `target/release/sql-tui`.
 | `1` / `2` / `3` | Data / Columns / Stats tab |
 | `j` / `k` | Navigate rows |
 | `h` / `l` | Navigate columns |
-| `PageUp` / `PageDown` | Fast scroll |
+| `Ctrl+U` / `Ctrl+D` | Smooth scroll |
 | `Home` / `End` | First / Last row |
 | `Ctrl+Y` | Copy cell value |
 | `Ctrl+E` | Export CSV |
