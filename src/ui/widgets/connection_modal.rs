@@ -4,7 +4,7 @@
 //! and a form on the right.
 
 use crate::app::{App, ConnectionModalFocus};
-use crate::config::ConnectionForm;
+use crate::db::DatabaseBackend;
 use crate::ui::DefaultTheme;
 use ratatui::prelude::*;
 use ratatui::widgets::{Block, Borders, Clear, List, ListItem, Paragraph};
@@ -15,7 +15,7 @@ pub fn draw_connection_modal(f: &mut Frame, app: &App, area: Rect) {
     let modal_area = if app.connection_modal_focus == ConnectionModalFocus::List {
         centered_rect(20, 40, area)
     } else {
-        centered_rect(30, 38, area)
+        centered_rect(30, 50, area)
     };
 
     // Clear the background
@@ -30,28 +30,25 @@ pub fn draw_connection_modal(f: &mut Frame, app: &App, area: Rect) {
         .title_bottom(Line::from(if app.connection_modal_focus == ConnectionModalFocus::List {
             "[E] Editar [Enter] Conectar".to_string()
         } else {
-            "[Esc] Voltar [Enter] Salvar e conectar".to_string()
+            let backend_hint = match app.connection_form.backend {
+                DatabaseBackend::SqlServer => "[Tab] Campos [Ctrl+T] SQLite",
+                DatabaseBackend::Sqlite => "[Tab] Campos [Ctrl+T] SQL Server",
+            };
+            format!("[Esc] Voltar {} [Enter] Salvar", backend_hint)
         }).right_aligned())
         .style(DefaultTheme::popup());
 
     let inner = modal_block.inner(modal_area);
     f.render_widget(modal_block, modal_area);
 
-    // Split into left (list) and right (form)
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Percentage(100),  // Connection list
-            // Constraint::Percentage(35),  // Connection list
-            // Constraint::Percentage(65),  // Form
-        ])
+        .constraints([Constraint::Percentage(100)])
         .split(inner);
 
     if app.connection_modal_focus == ConnectionModalFocus::List {
-        // Draw left panel (connection list)
         draw_connection_list(f, app, chunks[0]);
     } else {
-        // Draw right panel (form or placeholder)
         draw_connection_form(f, app, chunks[0]);
     }
 }
@@ -71,33 +68,37 @@ fn draw_connection_list(f: &mut Frame, app: &App, area: Rect) {
     let inner = block.inner(area);
     f.render_widget(block, area);
 
-    // Build list items
     let mut items: Vec<ListItem> = Vec::new();
 
-    // Add existing connections
     for (i, conn) in app.app_config.connections.iter().enumerate() {
         let is_selected = i == app.connection_list_selected;
         let prefix = if is_selected { "▶ " } else { "  " };
-        
+
         let style = if is_selected {
             Style::default().fg(DefaultTheme::GOLD).add_modifier(Modifier::BOLD)
         } else {
             DefaultTheme::normal_text()
         };
 
+        let backend_tag = match conn.backend {
+            DatabaseBackend::SqlServer => "",
+            DatabaseBackend::Sqlite => " [SQLite]",
+        };
+
         items.push(ListItem::new(Line::from(vec![
             Span::styled(prefix, style),
             Span::styled(&conn.name, style),
+            Span::styled(backend_tag, DefaultTheme::dim_text()),
         ])));
     }
 
-    // Add separator
+    // Separator
     items.push(ListItem::new(Line::from(Span::styled(
         "───────────────────────",
         DefaultTheme::dim_text(),
     ))));
 
-    // Add "Create new" option
+    // "Create new" option
     let create_new_idx = app.app_config.connections.len();
     let is_create_selected = app.connection_list_selected >= create_new_idx;
     let create_style = if is_create_selected {
@@ -106,7 +107,7 @@ fn draw_connection_list(f: &mut Frame, app: &App, area: Rect) {
         Style::default().fg(DefaultTheme::SUCCESS)
     };
     let create_prefix = if is_create_selected { "▶ " } else { "  " };
-    
+
     items.push(ListItem::new(Line::from(vec![
         Span::styled(create_prefix, create_style),
         Span::styled(t!("create_new_connection").to_string(), create_style),
@@ -127,7 +128,6 @@ fn draw_connection_form(f: &mut Frame, app: &App, area: Rect) {
     let inner = block.inner(area);
     f.render_widget(block, area);
 
-    // If no connection is selected and not creating new, show placeholder
     if app.app_config.connections.is_empty() && !app.is_create_new_selected() {
         let placeholder = Paragraph::new(vec![
             Line::from(""),
@@ -142,14 +142,18 @@ fn draw_connection_form(f: &mut Frame, app: &App, area: Rect) {
         return;
     }
 
-    // Draw form fields
     let form = &app.connection_form;
     let focus_idx = app.connection_form_focus;
+    let num_fields = form.field_count();
 
     // Layout for form fields
     let field_height = 2u16;
     let mut constraints = Vec::new();
-    for _ in 0..ConnectionForm::FIELD_COUNT {
+
+    // Backend selector row
+    constraints.push(Constraint::Length(2));
+
+    for _ in 0..num_fields {
         constraints.push(Constraint::Length(field_height));
     }
     constraints.push(Constraint::Length(2)); // Spacing
@@ -162,34 +166,44 @@ fn draw_connection_form(f: &mut Frame, app: &App, area: Rect) {
         .margin(1)
         .split(inner);
 
+    // Draw backend selector
+    let backend_label = match form.backend {
+        DatabaseBackend::SqlServer => "Driver: SQL Server",
+        DatabaseBackend::Sqlite => "Driver: SQLite",
+    };
+    let backend_style = Style::default().fg(DefaultTheme::GOLD).add_modifier(Modifier::BOLD);
+    let backend_para = Paragraph::new(backend_label).style(backend_style);
+    f.render_widget(backend_para, field_chunks[0]);
+
     // Draw each field
-    for i in 0..ConnectionForm::FIELD_COUNT {
+    for i in 0..num_fields {
         draw_form_field(
             f,
-            ConnectionForm::get_field_label(i),
+            form.get_field_label(i),
             form.get_field(i),
             i == focus_idx && is_focused,
-            i == 4, // Password field (index 4)
-            field_chunks[i],
+            form.is_password_field(i),
+            field_chunks[i + 1],  // +1 because index 0 is backend selector
         );
     }
 
     // Draw hint
-    let hint_style = if form.is_valid() {
-        DefaultTheme::success()
-    } else {
-        DefaultTheme::dim_text()
-    };
-    
-    // If the form is not valid, show the hint text
-    if !form.is_valid() {
-        let hint_text = t!("fill_required_fields").to_string();
+    let hint_idx = num_fields + 2; // backend + fields + spacing
+    if hint_idx < field_chunks.len() {
+        let hint_style = if form.is_valid() {
+            DefaultTheme::success()
+        } else {
+            DefaultTheme::dim_text()
+        };
 
-        let hint = Paragraph::new(Line::from(vec![
-            Span::styled("  ", Style::default()),
-            Span::styled(hint_text, hint_style),
-        ]));
-        f.render_widget(hint, field_chunks[ConnectionForm::FIELD_COUNT + 1]);
+        if !form.is_valid() {
+            let hint_text = t!("fill_required_fields").to_string();
+            let hint = Paragraph::new(Line::from(vec![
+                Span::styled("  ", Style::default()),
+                Span::styled(hint_text, hint_style),
+            ]));
+            f.render_widget(hint, field_chunks[hint_idx]);
+        }
     }
 }
 
@@ -198,22 +212,19 @@ fn draw_form_field(f: &mut Frame, label: &str, value: &str, is_focused: bool, is
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
-            Constraint::Length(12),  // Label
-            Constraint::Min(20),     // Input
+            Constraint::Length(12),
+            Constraint::Min(20),
         ])
         .split(area);
 
-    // Label
     let label_style = if is_focused {
         Style::default().fg(DefaultTheme::GOLD).add_modifier(Modifier::BOLD)
     } else {
         DefaultTheme::normal_text()
     };
-    let label_text = Paragraph::new(format!("{}:", label))
-        .style(label_style);
+    let label_text = Paragraph::new(format!("{}:", label)).style(label_style);
     f.render_widget(label_text, chunks[0]);
 
-    // Input field
     let display_value = if is_password && !value.is_empty() {
         "*".repeat(value.len())
     } else {
@@ -225,8 +236,7 @@ fn draw_form_field(f: &mut Frame, label: &str, value: &str, is_focused: bool, is
             .fg(DefaultTheme::TEXT)
             .bg(DefaultTheme::BG_HIGHLIGHT)
     } else {
-        Style::default()
-            .fg(DefaultTheme::TEXT)
+        Style::default().fg(DefaultTheme::TEXT)
     };
 
     let border_style = if is_focused {
@@ -235,7 +245,6 @@ fn draw_form_field(f: &mut Frame, label: &str, value: &str, is_focused: bool, is
         DefaultTheme::inactive_border()
     };
 
-    // Show cursor if focused
     let display_with_cursor = if is_focused {
         format!("{}▏", display_value)
     } else {

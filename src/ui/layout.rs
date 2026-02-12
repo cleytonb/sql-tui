@@ -58,14 +58,15 @@ fn draw_header(f: &mut Frame, app: &App, area: Rect) {
 
     // Connection info
     let conn_info = if let Some(ref db) = app.db {
-        let database = db.config.database.replace("Evermart", "Checkout");
+        let database = db.database_name().replace("Evermart", "Checkout");
+        let backend_label = db.backend().to_string();
         Paragraph::new(vec![
             Line::from(""),
             Line::from(vec![
                 Span::styled("● ", DefaultTheme::success()),
                 Span::styled(database, DefaultTheme::normal_text()),
-                Span::styled(" @ ", DefaultTheme::dim_text()),
-                Span::styled(&db.config.host, DefaultTheme::dim_text()),
+                Span::styled(" · ", DefaultTheme::dim_text()),
+                Span::styled(backend_label, DefaultTheme::dim_text()),
             ]),
             Line::from(""),
         ])

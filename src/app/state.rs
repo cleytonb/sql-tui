@@ -5,7 +5,7 @@
 
 use crate::completion::CompletionState;
 use crate::config::{AppConfig, ConnectionConfig, ConnectionForm};
-use crate::db::{ColumnDef, DbConnection, QueryResult};
+use crate::db::{ColumnDef, DatabaseBackend, DatabaseDriver, QueryResult};
 use crate::app::{QueryHistory, UndoManager};
 use anyhow::Result;
 use std::collections::HashMap;
@@ -105,8 +105,8 @@ pub enum ConnectionModalFocus {
 /// Main application state
 pub struct App {
     // === Database ===
-    /// Database connection (None when not connected yet)
-    pub db: Option<DbConnection>,
+    /// Database driver (None when not connected yet)
+    pub db: Option<Box<dyn DatabaseDriver>>,
 
     // === Connection Management ===
     /// Application configuration (saved connections)
@@ -231,23 +231,24 @@ impl App {
         crate::init_locale(app_config.locale.as_deref());
         
         // Try to connect to the last used connection
-        let (db, show_modal, server_version) = if let Some(ref last_name) = app_config.last_connection {
-            if let Some(conn_config) = app_config.get_connection(last_name) {
-                match DbConnection::from_config(conn_config).await {
-                    Ok(db) => {
-                        let version = db.get_server_version().await
-                            .unwrap_or_else(|_| "Unknown".to_string());
-                        let short = version.lines().next().unwrap_or("SQL Server").to_string();
-                        (Some(db), false, short)
+        let (db, show_modal, server_version): (Option<Box<dyn DatabaseDriver>>, bool, String) =
+            if let Some(ref last_name) = app_config.last_connection {
+                if let Some(conn_config) = app_config.get_connection(last_name) {
+                    match Self::create_driver(conn_config).await {
+                        Ok(driver) => {
+                            let version = driver.get_server_version().await
+                                .unwrap_or_else(|_| "Unknown".to_string());
+                            let short = version.lines().next().unwrap_or("Database").to_string();
+                            (Some(driver), false, short)
+                        }
+                        Err(_) => (None, true, String::new()),
                     }
-                    Err(_) => (None, true, String::new()),
+                } else {
+                    (None, true, String::new())
                 }
             } else {
                 (None, true, String::new())
-            }
-        } else {
-            (None, true, String::new())
-        };
+            };
 
         let is_connected = db.is_some();
         let cursor_pos = 0;
@@ -319,38 +320,63 @@ impl App {
         self.db.is_some()
     }
 
-    /// Get database connection reference (panics if not connected)
-    pub fn db(&self) -> &DbConnection {
-        self.db.as_ref().expect("Not connected to database")
+    /// Get database driver reference (panics if not connected)
+    pub fn db(&self) -> &dyn DatabaseDriver {
+        self.db.as_ref().expect("Not connected to database").as_ref()
     }
 
-    /// Get mutable database connection reference (panics if not connected)
-    pub fn db_mut(&mut self) -> &mut DbConnection {
-        self.db.as_mut().expect("Not connected to database")
+    /// Get mutable database driver reference (panics if not connected)
+    pub fn db_mut(&mut self) -> &mut dyn DatabaseDriver {
+        self.db.as_mut().expect("Not connected to database").as_mut()
+    }
+
+    /// Create a database driver from a ConnectionConfig
+    pub async fn create_driver(config: &ConnectionConfig) -> Result<Box<dyn DatabaseDriver>> {
+        match config.backend {
+            DatabaseBackend::SqlServer => {
+                use crate::db::sqlserver::{SqlServerConfig, SqlServerDriver};
+                let cfg = SqlServerConfig {
+                    host: config.host.clone(),
+                    port: config.port,
+                    user: config.user.clone(),
+                    password: config.password.clone(),
+                    database: config.database.clone(),
+                    encrypt: false,
+                    trust_cert: true,
+                };
+                let driver = SqlServerDriver::new(cfg).await?;
+                Ok(Box::new(driver))
+            }
+            DatabaseBackend::Sqlite => {
+                use crate::db::sqlite::SqliteDriver;
+                let driver = SqliteDriver::new(config.sqlite_path.clone().into()).await?;
+                Ok(Box::new(driver))
+            }
+        }
     }
 
     /// Connect to a database using the given config
     pub async fn connect(&mut self, config: &ConnectionConfig) -> Result<()> {
-        let db = DbConnection::from_config(config).await?;
-        
-        let version = db.get_server_version().await
+        let driver = Self::create_driver(config).await?;
+
+        let version = driver.get_server_version().await
             .unwrap_or_else(|_| "Unknown".to_string());
-        let short_version = version.lines().next().unwrap_or("SQL Server").to_string();
-        
-        self.db = Some(db);
+        let short_version = version.lines().next().unwrap_or("Database").to_string();
+
+        self.db = Some(driver);
         self.server_version = short_version.clone();
         self.status = format!("Conectado | {}", short_version);
         self.message = Some(t!("connected_to", name = config.name).to_string());
         self.show_connection_modal = false;
-        
+
         // Update last connection and save config
         self.app_config.set_last_connection(&config.name);
         let _ = self.app_config.save();
-        
+
         // Load schema and start loading columns in background
         let _ = self.load_schema().await;
         self.start_column_loading();
-        
+
         Ok(())
     }
 

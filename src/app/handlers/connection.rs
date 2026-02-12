@@ -2,6 +2,7 @@
 
 use crate::app::{App, ConnectionModalFocus};
 use crate::config::ConnectionForm;
+use crate::db::DatabaseBackend;
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use rust_i18n::t;
@@ -32,6 +33,16 @@ impl App {
             KeyCode::BackTab if self.connection_modal_focus == ConnectionModalFocus::Form => self.handle_connection_up(),
             KeyCode::Tab if self.connection_modal_focus == ConnectionModalFocus::Form && key.modifiers.contains(KeyModifiers::SHIFT) => self.handle_connection_up(),
             KeyCode::Tab if self.connection_modal_focus == ConnectionModalFocus::Form => self.handle_connection_down(),
+            // Ctrl+T toggles backend in form mode
+            KeyCode::Char('t') if key.modifiers.contains(KeyModifiers::CONTROL)
+                && self.connection_modal_focus == ConnectionModalFocus::Form =>
+            {
+                self.connection_form.backend = match self.connection_form.backend {
+                    DatabaseBackend::SqlServer => DatabaseBackend::Sqlite,
+                    DatabaseBackend::Sqlite => DatabaseBackend::SqlServer,
+                };
+                self.connection_form_focus = 0;
+            }
             KeyCode::Char(c) => self.handle_connection_char(c),
             KeyCode::Backspace => self.handle_connection_backspace(),
 
@@ -118,7 +129,7 @@ impl App {
                 }
             }
             ConnectionModalFocus::Form => {
-                if self.connection_form_focus < ConnectionForm::FIELD_COUNT - 1 {
+                if self.connection_form_focus < self.connection_form.field_count() - 1 {
                     self.connection_form_focus += 1;
                 }
             }

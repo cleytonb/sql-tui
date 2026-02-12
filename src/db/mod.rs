@@ -1,9 +1,11 @@
-//! Database module for SQL Server connectivity
+//! Database module — driver abstraction + SQL Server and SQLite backends
 
-mod connection;
+mod driver;
 mod query;
 mod schema;
+pub mod sqlserver;
+pub mod sqlite;
 
-pub use connection::*;
+pub use driver::*;
 pub use query::*;
 pub use schema::*;
